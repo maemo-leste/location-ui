@@ -1,0 +1,141 @@
+location-ui (0.96-1) unstable; urgency=low
+
+  * Fixes: NB#155944 - Location related packages are not build with optimizations
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Tue, 02 Mar 2009 15:56:10 +0300
+
+location-ui (0.95-1) unstable; urgency=low
+
+  * Fixes: NB#138544 - Location-related componets are spamming syslog
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Tue, 13 Oct 2009 17:28:23 +0300
+
+location-ui (0.94-1) unstable; urgency=low
+
+  * Fixes: NB#138245 - home applet tries in vain if BT is turned off after
+    pairing an external GPS
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Thu, 10 Sep 2009 11:03:50 +0300
+
+location-ui (0.93-2) unstable; urgency=low
+
+  * Fixes: NB#131509 - Geotags disclaimer dialog has wrong height
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Fri, 07 Aug 2009 14:10:01 +0300
+
+location-ui (0.93-1) unstable; urgency=low
+
+  * Fixes: NB#128710 - Layout issues with dialog: allowing the use of
+    positioning (notice and disclaimer)
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Thu, 23 Jul 2009 12:13:34 +0300
+
+location-ui (0.92-5) unstable; urgency=low
+
+  * "Enable positioning" dialog updated to be finger-usable
+  * Fixes: NB#114243 - Enable positioning dialog uses old style checkbox widget
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Thu, 07 May 2009 15:13:47 +0200
+
+location-ui (0.92-4) unstable; urgency=low
+
+  * Added one dialog for default supl usage
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Thu, 05 Feb 2009 18:46:11 +0300
+
+location-ui (0.92-3) unstable; urgency=low
+
+  * Fix a logical string.
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Tue, 27 Jan 2009 12:26:30 +0300
+
+location-ui (0.92-2) unstable; urgency=low
+
+  * Integrated BT disconnect error handling.
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Fri, 23 Jan 2009 16:59:30 +0300
+
+location-ui (0.92-1) unstable; urgency=low
+
+  * Moved from session to system dbus and run my maemo-launcher
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Wed, 14 Jan 2009 13:30:30 +0300
+
+location-ui (0.91-10) unstable; urgency=low
+
+  * Fixes: NB#96447 - Disclaimer dialog text area is not pannable
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Tue, 23 Dec 2008 19:30:30 +0300
+
+location-ui (0.91-9) unstable; urgency=low
+
+  * Add dependency on hildon-libs translations package.
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Thu, 18 Dec 2008 17:35:10 +0300
+
+location-ui (0.91-8) unstable; urgency=low
+
+  * Use the correct domain for the "Done" button in positioning dialog.
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Wed, 17 Dec 2008 17:20:10 +0300
+
+location-ui (0.91-7) unstable; urgency=low
+
+  * Fix a logical string according to the Hildon and Location UI specs.
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Fri, 12 Dec 2008 17:13:10 +0300
+
+location-ui (0.91-6) unstable; urgency=low
+
+  * Fixes: NB#94872 - Reject button missing from disclaimer dialog
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Wed, 10 Dec 2008 20:02:10 +0300
+
+location-ui (0.91-5) unstable; urgency=low
+
+  * Specify an installation dependency on the translation package
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Tue, 09 Dec 2008 12:21:00 +0300
+
+location-ui (0.91-4) unstable; urgency=low
+
+  * Specify a build dependency on the translation package
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Wed, 03 Dec 2008 14:10:00 +0300
+
+location-ui (0.91-3) unstable; urgency=low
+
+  * Create the AGNSS dialog.
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Thu, 20 Nov 2008 18:29:00 +0300
+
+location-ui (0.91-2) unstable; urgency=low
+
+  * Create another dialog according to the UI spec.
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Wed, 19 Nov 2008 16:50:00 +0300
+
+location-ui (0.91-1) unstable; urgency=low
+
+  * Create the new dialogs according to the UI spec.
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Thu, 13 Nov 2008 17:29:16 +0300
+
+location-ui (0.90-2) unstable; urgency=low
+
+  * Updated rules to run autogen.sh
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Tue, 08 Jul 2008 13:20:16 +0300
+
+location-ui (0.90-1) unstable; urgency=low
+
+  * Updated packaging for the base delivery.
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Fri, 04 Jul 2008 14:24:37 +0300
+
+location-ui (0.1-1) unstable; urgency=low
+
+  * Initial release.
+
+ -- Quanyi Sun <Quanyi.Sun@nokia.com>  Tue, 20 May 2008 10:28:32 +0200
+
