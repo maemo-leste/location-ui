@@ -1,4 +1,20 @@
 #!/usr/bin/make -f
 
+OPTS = ""
+
+ifeq (,$(findstring nolauncher,$(DEB_BUILD_OPTIONS)))
+	OPTS += "--enable-maemo-launcher=yes"
+	USE_MAEMO_LAUNCHER = true
+endif
+
 %:
 	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(OPTS)
+
+override_dh_auto_install:
+	dh_auto_install
+	if test "x$(USE_MAEMO_LAUNCHER)" = "xtrue"; then \
+		dh_maemolauncher /usr/libexec/location-ui ; \
+	fi
