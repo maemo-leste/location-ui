@@ -66,6 +66,7 @@ typedef struct location_ui_t {
 } location_ui_t;
 
 /* function declarations */
+static GtkWidget *create_positioning_dialog(void);
 static GtkWidget *create_enable_gps_dialog(void);
 static GtkWidget *create_enable_network_dialog(void);
 static GtkWidget *create_agnss_dialog(void);
@@ -94,6 +95,36 @@ static DBusObjectPathVTable find_callback_vtable;
 static struct dialog_data_t funcmap[7];
 static DBusMessage *(*display_close_map[2])() =
     { location_ui_close_dialog, location_ui_display_dialog };
+
+GtkWidget *create_positioning_dialog(void)
+{
+	char *gps_on_text, *done_text, *gps_text, *net_text;
+	GtkWidget *dialog, *cb_gps, *cb_net;
+
+	gps_on_text =
+	    dcgettext(NULL, "loca_ti_switch_gps_network_on", LC_MESSAGES);
+	done_text = dcgettext("hildon-libs", "wdgt_bd_done", LC_MESSAGES);
+
+	dialog = gtk_dialog_new_with_buttons(gps_on_text, NULL,
+					     GTK_DIALOG_NO_SEPARATOR, done_text,
+					     GTK_RESPONSE_OK, NULL);
+
+	cb_gps = hildon_check_button_new(HILDON_SIZE_FINGER_HEIGHT);
+	gps_text = dcgettext(NULL, "loca_fi_gps", LC_MESSAGES);
+	gtk_button_set_label(GTK_BUTTON(cb_gps), gps_text);
+	gtk_box_pack_start(GTK_BOX(dialog), cb_gps, FALSE, FALSE, 0);
+	gtk_widget_show(cb_gps);
+	g_object_set_data(G_OBJECT(dialog), "gps-cb", cb_gps);
+
+	cb_net = hildon_check_button_new(HILDON_SIZE_FINGER_HEIGHT);
+	net_text = dcgettext(NULL, "loca_fi_network", LC_MESSAGES);
+	gtk_button_set_label(GTK_BUTTON(cb_net), net_text);
+	gtk_box_pack_start(GTK_BOX(dialog), cb_net, FALSE, FALSE, 0);
+	gtk_widget_show(cb_gps);
+	g_object_set_data(G_OBJECT(dialog), "net-cb", cb_net);
+
+	return dialog;
+}
 
 GtkWidget *create_enable_gps_dialog(void)
 {
@@ -372,8 +403,7 @@ DBusMessage *location_ui_display_dialog(location_ui_t * location_ui,
 		return dbus_message_new_error_printf(msg,
 						     "com.nokia.Location.UI.Error.InUse",
 						     "%d",
-						     dialog_data->
-						     dialog_response_code);
+						     dialog_data->dialog_response_code);
 
 	have_no_dialog = location_ui->current_dialog == NULL;
 	dialog_data->maybe_path = maybe_path;
