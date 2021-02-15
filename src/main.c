@@ -407,7 +407,7 @@ DBusMessage *location_ui_close_dialog(location_ui_t * location_ui, GList * list,
 		dbus_connection_unregister_object_path(location_ui->dbus,
 						       dbus_obj_path);
 		g_free(dialog_data->dbus_object_path);
-		g_slice_free1(24u, dialog_data);	/* (sizeof(dialog_data), dialog_data) ? */
+		g_slice_free1(24u, dialog_data);	/* TODO: (sizeof(dialog_data), dialog_data) ? */
 	}
 	if (dialog_active == 2) {
 		if (location_ui->current_dialog != dialog_data)
