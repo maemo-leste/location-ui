@@ -66,6 +66,7 @@ typedef struct location_ui_t {
 } location_ui_t;
 
 /* function declarations */
+static GtkWidget *create_bt_disconnect_dialog(void);
 static GtkWidget *create_privacy_verification_dialog(DBusMessage *,
 						     DBusError *);
 static GtkWidget *create_privacy_information_dialog(DBusMessage *, DBusError *);
@@ -90,6 +91,14 @@ static DBusObjectPathVTable find_callback_vtable;
 static struct dialog_data_t funcmap[7];
 static DBusMessage *(*display_close_map[2])() =
     { location_ui_close_dialog, location_ui_display_dialog };
+
+GtkWidget *create_bt_disconnect_dialog(void)
+{
+	return hildon_note_new_confirmation(NULL,
+					    dcgettext(NULL,
+						      "loca_nc_bt_reconnect",
+						      LC_MESSAGES));
+}
 
 GtkWidget *create_privacy_verification_dialog(DBusMessage * msg,
 					      DBusError * err)
@@ -343,8 +352,7 @@ DBusMessage *location_ui_display_dialog(location_ui_t * location_ui,
 		return dbus_message_new_error_printf(msg,
 						     "com.nokia.Location.UI.Error.InUse",
 						     "%d",
-						     dialog_data->
-						     dialog_response_code);
+						     dialog_data->dialog_response_code);
 
 	have_no_dialog = location_ui->current_dialog == NULL;
 	dialog_data->maybe_path = maybe_path;
