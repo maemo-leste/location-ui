@@ -66,7 +66,12 @@ typedef struct location_ui_t {
 } location_ui_t;
 
 /* function declarations */
+static DBusMessage *location_ui_close_dialog(location_ui_t *, GList *,
+					     DBusMessage *);
+static DBusMessage *location_ui_display_dialog(location_ui_t *, GList *,
+					       DBusMessage *);
 static int compare_dialog_path(location_ui_t *, const char *);
+static int find_dbus_cb(int, DBusMessage *, location_ui_t *);
 static int on_inactivity_timeout(location_ui_t *);
 static void on_dialog_response(GtkWidget *, int, location_ui_t *);
 static location_ui_dialog *find_next_dialog(location_ui_t *);
@@ -76,10 +81,53 @@ static void schedule_new_dialog(location_ui_t *);
 static DBusObjectPathVTable vtable;
 static DBusObjectPathVTable find_callback_vtable;
 static struct dialog_data_t funcmap[7];
+static DBusMessage *(*display_close_map[2])() =
+    { location_ui_close_dialog, location_ui_display_dialog };
 
 int compare_dialog_path(location_ui_t * location_ui, const char *path)
 {
 	return strcmp((const char *)location_ui->current_dialog, path);
+}
+
+int find_dbus_cb(int unused, DBusMessage * in_msg, location_ui_t * location_ui)
+{
+	int cnt, idx;
+	const char *member, *message_path;
+	GList *dialog_entry;
+	gboolean found;
+	DBusMessage *out_msg;
+
+	cnt = 0;
+	member = dbus_message_get_member(in_msg);
+	message_path = dbus_message_get_path(in_msg);
+	while (1) {
+		/* TODO: review */
+		found = g_str_equal(member, (&display_close_map)[2 * cnt]);
+		idx = 2 * cnt++;
+		if (found)
+			break;
+		if (cnt == 2)
+			return 1;
+	}
+	/* Lookup function in previously created GList with path */
+	dialog_entry = g_list_find_custom(location_ui->dialogs, message_path,
+					  (GCompareFunc) compare_dialog_path);
+	if (dialog_entry) {
+		/* TODO: Review */
+		out_msg =
+		    display_close_map[idx + 1] (location_ui, dialog_entry,
+						in_msg);
+	} else {
+		out_msg =
+		    dbus_message_new_error(in_msg,
+					   "org.freedesktop.DBus.Error.Failed",
+					   "Bad object");
+	}
+
+	dbus_connection_send(location_ui->dbus, out_msg, NULL);
+	dbus_connection_flush(location_ui->dbus);
+	dbus_message_unref(out_msg);
+	return 0;
 }
 
 int on_inactivity_timeout(location_ui_t * location_ui)
