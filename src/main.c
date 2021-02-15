@@ -84,7 +84,73 @@ int on_inactivity_timeout(location_ui_t * location_ui)
 void on_dialog_response(GtkWidget * dialog, int gtk_response,
 			location_ui_t * location_ui)
 {
-	return;
+	dialog_data_t *item;
+	GTypeInstance *gps_cb_data, *net_cb_data;
+	GType hildon_checkbox_type;
+	HildonCheckButton *net_cb_button, *gps_cb_button;
+	gboolean net_button_active, gps_button_active;
+	int gps_active_status, net_active_status, resp_code;
+	DBusMessage *msg;
+	gpointer cur_dialog;
+
+	item = g_object_get_data(G_OBJECT(dialog), "dialog-data");
+	if (!item)
+		g_assert("item != NULL");
+
+	item->dialog_response_code = 0;
+	gps_cb_data = g_object_get_data(G_OBJECT(dialog), "gps-cb");
+	net_cb_data = g_object_get_data(G_OBJECT(dialog), "net-cb");
+	if (gps_cb_data && net_cb_data) {
+		hildon_checkbox_type = hildon_check_button_get_type();
+		net_cb_button =
+		    (HildonCheckButton *)
+		    g_type_check_instance_cast(net_cb_data,
+					       hildon_checkbox_type);
+		net_button_active =
+		    hildon_check_button_get_active(net_cb_button);
+		gps_cb_button =
+		    (HildonCheckButton *)
+		    g_type_check_instance_cast(gps_cb_data,
+					       hildon_checkbox_type);
+		gps_button_active =
+		    hildon_check_button_get_active(gps_cb_button);
+		gps_active_status = item->dialog_response_code;
+		if (net_button_active)
+			net_active_status = 2;
+		else
+			net_active_status = 0;
+		if (gps_button_active)
+			gps_active_status |= 1u;
+		item->dialog_response_code =
+		    gps_active_status | net_active_status;
+	} else if (gtk_response == GTK_RESPONSE_OK) {
+		/* ok/accepted */
+		item->dialog_response_code = 0;
+	} else {
+		if (gtk_response == GTK_RESPONSE_CANCEL)
+			resp_code = 1;
+		else
+			/* unknown/invalid ? */
+			resp_code = -1;
+		item->dialog_response_code = resp_code;
+	}
+
+	msg =
+	    dbus_message_new_signal(item->dbus_object_path, LUI_DBUS_DIALOG,
+				    "response");
+	dbus_message_append_args(msg, DBUS_TYPE_INT32,
+				 &item->dialog_response_code,
+				 DBUS_TYPE_INVALID);
+	dbus_connection_send(location_ui->dbus, msg, NULL);
+	dbus_connection_flush(location_ui->dbus);
+	dbus_message_unref(msg);
+	gtk_widget_hide(dialog);
+	cur_dialog = location_ui->current_dialog;
+	item->dialog_active = 3;
+	if (cur_dialog == item) {
+		location_ui->current_dialog = NULL;
+		schedule_new_dialog(location_ui);
+	}
 }
 
 location_ui_dialog *find_next_dialog(location_ui_t * location_ui)
