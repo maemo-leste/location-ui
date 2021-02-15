@@ -89,6 +89,58 @@ int compare_dialog_path(location_ui_t * location_ui, const char *path)
 	return strcmp((const char *)location_ui->current_dialog, path);
 }
 
+DBusMessage *location_ui_close_dialog(location_ui_t * location_ui, GList * list,
+				      DBusMessage * msg)
+{
+	dialog_data_t *dialog_data;
+	int dialog_active, note_type;
+	GList *dialogs;
+	char *dbus_obj_path;
+	DBusMessage *new_msg;
+
+	dialog_data = list->data;
+	dialog_active = dialog_data->dialog_active;
+	new_msg = dbus_message_new_method_return(msg);
+	dbus_message_append_args(new_msg, DBUS_TYPE_INT32,
+				 &dialog_data->dialog_response_code,
+				 DBUS_TYPE_INVALID);
+	/* TODO: Review */
+	if (dialog_data->window) {
+		if (HILDON_IS_NOTE(dialog_data->window)) {
+			note_type = 0;
+			g_object_get(G_OBJECT(dialog_data->window), "note-type",
+				     &note_type, 0);
+			if ((unsigned int)(note_type - 2) > 1)
+				gtk_widget_destroy(GTK_WIDGET
+						   (dialog_data->window));
+		} else {
+			gtk_widget_destroy(GTK_WIDGET(dialog_data->window));
+		}
+		dialog_data->window = NULL;
+	}
+
+	if (dialog_data->foo2) {
+		dialog_data->dialog_active = 0;
+		dialog_data->maybe_path = 0;
+		dialog_data->dialog_response_code = -1;
+	} else {
+		dialogs = g_list_delete_link(location_ui->dialogs, list);
+		dbus_obj_path = dialog_data->dbus_object_path;
+		location_ui->dialogs = dialogs;
+		dbus_connection_unregister_object_path(location_ui->dbus,
+						       dbus_obj_path);
+		g_free(dialog_data->dbus_object_path);
+		g_slice_free1(24u, dialog_data);	/* (sizeof(dialog_data), dialog_data) ? */
+	}
+	if (dialog_active == 2) {
+		if (location_ui->current_dialog != dialog_data)
+			g_assert("location_ui->current_dialog == dialog_data");
+		location_ui->current_dialog = NULL;
+		schedule_new_dialog(location_ui);
+	}
+	return new_msg;
+}
+
 DBusMessage *location_ui_display_dialog(location_ui_t * location_ui,
 					GList * list, DBusMessage * msg)
 {
@@ -110,8 +162,7 @@ DBusMessage *location_ui_display_dialog(location_ui_t * location_ui,
 		return dbus_message_new_error_printf(msg,
 						     "com.nokia.Location.UI.Error.InUse",
 						     "%d",
-						     dialog_data->
-						     dialog_response_code);
+						     dialog_data->dialog_response_code);
 
 	have_no_dialog = location_ui->current_dialog == NULL;
 	dialog_data->maybe_path = maybe_path;
