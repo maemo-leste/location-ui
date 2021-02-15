@@ -66,6 +66,7 @@ typedef struct location_ui_t {
 } location_ui_t;
 
 /* function declarations */
+static GtkWidget *create_bt_disabled_dialog(void);
 static DBusMessage *location_ui_close_dialog(location_ui_t *, GList *,
 					     DBusMessage *);
 static DBusMessage *location_ui_display_dialog(location_ui_t *, GList *,
@@ -83,6 +84,13 @@ static DBusObjectPathVTable find_callback_vtable;
 static struct dialog_data_t funcmap[7];
 static DBusMessage *(*display_close_map[2])() =
     { location_ui_close_dialog, location_ui_display_dialog };
+
+GtkWidget *create_bt_disabled_dialog(void)
+{
+	return hildon_note_new_information(0, dcgettext("osso-connectivity-ui",
+							"conn_ib_not_available_bt_off",
+							LC_MESSAGES));
+}
 
 int compare_dialog_path(location_ui_t * location_ui, const char *path)
 {
@@ -162,7 +170,8 @@ DBusMessage *location_ui_display_dialog(location_ui_t * location_ui,
 		return dbus_message_new_error_printf(msg,
 						     "com.nokia.Location.UI.Error.InUse",
 						     "%d",
-						     dialog_data->dialog_response_code);
+						     dialog_data->
+						     dialog_response_code);
 
 	have_no_dialog = location_ui->current_dialog == NULL;
 	dialog_data->maybe_path = maybe_path;
