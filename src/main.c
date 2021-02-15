@@ -91,32 +91,26 @@ GtkWidget *create_privacy_expired_dialog(DBusMessage * msg, DBusError * err)
 {
 	GtkWidget *ret = NULL;
 	gboolean accepted;
-	char unused;
+	char **arr;
 	int arrlen;
 	char *text;
 
 	if (!dbus_message_get_args(msg, err, DBUS_TYPE_BOOLEAN, &accepted,
-				   DBUS_TYPE_ARRAY, DBUS_TYPE_STRING, &unused,
+				   DBUS_TYPE_ARRAY, DBUS_TYPE_STRING, &arr,
 				   &arrlen, DBUS_TYPE_INVALID))
-		return ret;
+		return NULL;
 
-	if (arrlen == 2) {
-		if (accepted)
-			text =
-			    dcgettext(NULL, "loca_ni_accept_expired",
-				      LC_MESSAGES);
-		else
-			text =
-			    dcgettext(NULL, "loca_ni_reject_expired",
-				      LC_MESSAGES);
-
-		ret = hildon_note_new_information(NULL, text);
-	} else {
+	if (arrlen != 2) {
 		dbus_set_error(err, "org.freedesktop.DBus.Error.Failed",
 			       "Provide requestor and client");
+		return NULL;
 	}
+	if (accepted)
+		text = dcgettext(NULL, "loca_ni_accept_expired", LC_MESSAGES);
+	else
+		text = dcgettext(NULL, "loca_ni_reject_expired", LC_MESSAGES);
 
-	return ret;
+	return hildon_note_new_information(NULL, text);
 }
 
 GtkWidget *create_default_supl_dialog(DBusMessage * msg, DBusError * err)
