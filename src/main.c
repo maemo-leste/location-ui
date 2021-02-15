@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Ivan J. <parazyd@dyne.org>
+ * Copyright (c) 2021 Ivan J. <parazyd@dyne.org>
  *
  * This file is part of location-ui
  *
@@ -18,34 +18,55 @@
  */
 
 #include <locale.h>
+#include <libintl.h>
 #include <stdlib.h>
 
 #include <dbus/dbus.h>
-#include <dbus/dbus-glib.h>
-#include <glib/glib.h>
+#include <dbus/dbus-glib-lowlevel.h>
+#include <glib.h>
 #include <gtk/gtk.h>
-#include <libintl.h>
 
-#define UI_SERVICE_NAME "com.nokia.Location.UI"
-#define UI_OBJECT_PATH  "/com/nokia/location/ui"
+#include <hildon/hildon.h>
 
-typedef struct location_ui {
+/* enums */
+#define LUI_DBUS_NAME    "com.nokia.Location.UI"
+#define LUI_DBUS_DIALOG  LUI_DBUS_NAME".Dialog"
+#define LUI_DBUS_PATH    "/com/nokia/location/ui"
+
+enum {
+	STATE_0,
+	STATE_QUEUE,
+	STATE_2,
+};
+
+typedef struct dialog_data_t {
+	GtkWindow *window;
+	char *dbus_object_path;
+	char *foo2;
+	char *maybe_path;
+	int dialog_response_code;
+	int dialog_active;
+} dialog_data_t;
+
+typedef struct location_ui_dialog {
+	char *maybe_dialog_instance;
+	const char *path;
+	int (*get_instance)(void);
+	int maybe_priority;
+	int int_ffffffff_everywhere;
+	int state;
+} location_ui_dialog;
+
+typedef struct location_ui_t {
 	GList *dialogs;
 	gpointer current_dialog;
 	DBusConnection *dbus;
 	guint inactivity_timeout_id;
-};
+} location_ui_t;
 
-typedef struct location_ui_dialog {
-	int field_0;
-	const char *path;
-	int (*get_instance)(void);
-	int field_C;
-	int field_10;
-	int state;
-};
+/* function declarations */
 
-int main(int argc, char **argv)
-{
-	return 0;
-}
+/* variables */
+static DBusObjectPathVTable vtable;
+static DBusObjectPathVTable find_callback_vtable;
+static struct dialog_data_t funcmap[7];
