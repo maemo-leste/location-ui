@@ -66,6 +66,7 @@ typedef struct location_ui_t {
 } location_ui_t;
 
 /* function declarations */
+static GtkWidget *create_privacy_information_dialog(DBusMessage *, DBusError *);
 static GtkWidget *create_privacy_timeout_dialog(DBusMessage *, DBusError *);
 static GtkWidget *create_privacy_expired_dialog(DBusMessage *, DBusError *);
 static GtkWidget *create_default_supl_dialog(DBusMessage *, DBusError *);
@@ -88,13 +89,47 @@ static struct dialog_data_t funcmap[7];
 static DBusMessage *(*display_close_map[2])() =
     { location_ui_close_dialog, location_ui_display_dialog };
 
+GtkWidget *create_privacy_information_dialog(DBusMessage * msg, DBusError * err)
+{
+	GtkWidget *ret = NULL;
+	int unused;
+	char **arr;
+	int arrlen;
+	char *text, *unk_text;
+	gchar *text_dup;
+
+	if (!dbus_message_get_args
+	    (msg, err, DBUS_TYPE_INT32, &unused, DBUS_TYPE_ARRAY,
+	     DBUS_TYPE_STRING, &arr, &arrlen, DBUS_TYPE_INVALID))
+		return NULL;
+
+	if (arrlen != 2) {
+		dbus_set_error(err, "org.freedesktop.DBus.Error.Failed",
+			       "Provide requestor and client");
+		return NULL;
+	}
+
+	text = dcgettext(NULL, "loca_ni_req_sent", LC_MESSAGES);
+
+	/* TODO: review */
+	if (**arr)
+		unk_text = *arr;
+	else
+		unk_text = dcgettext(NULL, "loca_va_unknown", LC_MESSAGES);
+
+	text_dup = g_strdup_printf(text, unk_text);
+	ret = hildon_note_new_information(NULL, text_dup);
+	g_free(text_dup);
+	return ret;
+}
+
 GtkWidget *create_privacy_timeout_dialog(DBusMessage * msg, DBusError * err)
 {
 	GtkWidget *ret = NULL;
 	int accepted;
 	char **arr;
 	int arrlen;
-	char *text, *first_arr_entry;
+	char *text, *unk_text;
 	gchar *text_dup;
 
 	if (!dbus_message_get_args
@@ -115,12 +150,11 @@ GtkWidget *create_privacy_timeout_dialog(DBusMessage * msg, DBusError * err)
 
 	/* TODO: review */
 	if (**arr)
-		first_arr_entry = *arr;
+		unk_text = *arr;
 	else
-		first_arr_entry =
-		    dcgettext(NULL, "loca_va_unknown", LC_MESSAGES);
+		unk_text = dcgettext(NULL, "loca_va_unknown", LC_MESSAGES);
 
-	text_dup = g_strdup_printf(text, first_arr_entry);
+	text_dup = g_strdup_printf(text, unk_text);
 	ret = hildon_note_new_information(NULL, text_dup);
 	g_free(text_dup);
 	return ret;
@@ -255,8 +289,7 @@ DBusMessage *location_ui_display_dialog(location_ui_t * location_ui,
 		return dbus_message_new_error_printf(msg,
 						     "com.nokia.Location.UI.Error.InUse",
 						     "%d",
-						     dialog_data->
-						     dialog_response_code);
+						     dialog_data->dialog_response_code);
 
 	have_no_dialog = location_ui->current_dialog == NULL;
 	dialog_data->maybe_path = maybe_path;
