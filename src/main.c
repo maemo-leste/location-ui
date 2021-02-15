@@ -78,6 +78,11 @@ static struct dialog_data_t funcmap[7];
 
 int on_inactivity_timeout(location_ui_t * location_ui)
 {
+	if (location_ui->current_dialog)
+		g_assert("location_ui->current_dialog == NULL");
+	if (find_next_dialog(location_ui))
+		g_assert("find_next_dialog(location_ui) == NULL");
+	gtk_main_quit();
 	return 0;
 }
 
@@ -102,14 +107,12 @@ void on_dialog_response(GtkWidget * dialog, int gtk_response,
 	net_cb_data = g_object_get_data(G_OBJECT(dialog), "net-cb");
 	if (gps_cb_data && net_cb_data) {
 		hildon_checkbox_type = hildon_check_button_get_type();
-		net_cb_button =
-		    (HildonCheckButton *)
+		net_cb_button = (HildonCheckButton *)
 		    g_type_check_instance_cast(net_cb_data,
 					       hildon_checkbox_type);
 		net_button_active =
 		    hildon_check_button_get_active(net_cb_button);
-		gps_cb_button =
-		    (HildonCheckButton *)
+		gps_cb_button = (HildonCheckButton *)
 		    g_type_check_instance_cast(gps_cb_data,
 					       hildon_checkbox_type);
 		gps_button_active =
