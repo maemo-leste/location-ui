@@ -66,6 +66,7 @@ typedef struct location_ui_t {
 } location_ui_t;
 
 /* function declarations */
+static GtkWidget *create_disclaimer_dialog(void);
 static GtkWidget *create_positioning_dialog(void);
 static GtkWidget *create_enable_gps_dialog(void);
 static GtkWidget *create_enable_network_dialog(void);
@@ -95,6 +96,41 @@ static DBusObjectPathVTable find_callback_vtable;
 static struct dialog_data_t funcmap[7];
 static DBusMessage *(*display_close_map[2])() =
     { location_ui_close_dialog, location_ui_display_dialog };
+
+GtkWidget *create_disclaimer_dialog(void)
+{
+	char *disclaimer_text, *disclaimer_ok, *disclaimer_reject;
+	char *fi_disclaimer_text;
+	GtkWidget *dialog, *widget_obj, *pan;
+
+	disclaimer_text = dcgettext(NULL, "loca_ti_disclaimer", LC_MESSAGES);
+	disclaimer_ok = dcgettext(NULL, "loca_bd_disclaimer_ok", LC_MESSAGES);
+	disclaimer_reject =
+	    dcgettext(NULL, "loca_bd_disclaimer_reject", LC_MESSAGES);
+
+	/* TODO: what is 42 below? */
+	dialog = gtk_dialog_new_with_buttons(disclaimer_text, NULL,
+					     GTK_DIALOG_NO_SEPARATOR,
+					     disclaimer_ok, GTK_RESPONSE_OK,
+					     disclaimer_reject, 42, NULL);
+
+	fi_disclaimer_text = dcgettext(NULL, "loca_fi_disclaimer", LC_MESSAGES);
+
+	widget_obj = g_object_new(gtk_label_get_type(), "justify", 0,
+				  "xalign", 0, 0, "yalign", 0, 0, 0, "wrap", 1,
+				  "label", fi_disclaimer_text, NULL);
+	gtk_widget_set_name(widget_obj, "osso-SmallFont");
+
+	pan = hildon_pannable_area_new();
+	hildon_pannable_area_add_with_viewport(HILDON_PANNABLE_AREA(pan),
+					       widget_obj);
+	g_object_set(pan, "hscrollbar-policy", 2, NULL);
+	gtk_widget_set_size_request(pan, -1, 350);
+
+	gtk_box_pack_start(GTK_BOX(dialog), pan, FALSE, TRUE, 0);
+	gtk_widget_show_all(dialog);
+	return dialog;
+}
 
 GtkWidget *create_positioning_dialog(void)
 {
