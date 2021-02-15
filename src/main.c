@@ -89,6 +89,38 @@ int compare_dialog_path(location_ui_t * location_ui, const char *path)
 	return strcmp((const char *)location_ui->current_dialog, path);
 }
 
+DBusMessage *location_ui_display_dialog(location_ui_t * location_ui,
+					GList * list, DBusMessage * msg)
+{
+	dbus_bool_t dbus_ret;
+	dialog_data_t *dialog_data;
+	int dialog_active_or_in_use;
+	gboolean have_no_dialog;
+	char *maybe_path;
+
+	/* TODO: Review maybe_path */
+	dbus_ret =
+	    dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &maybe_path,
+				  DBUS_TYPE_INVALID);
+	dialog_data = list->data;
+	dialog_active_or_in_use = dialog_data->dialog_active;
+	if (!dbus_ret)
+		maybe_path = 0;
+	if (dialog_active_or_in_use)
+		return dbus_message_new_error_printf(msg,
+						     "com.nokia.Location.UI.Error.InUse",
+						     "%d",
+						     dialog_data->
+						     dialog_response_code);
+
+	have_no_dialog = location_ui->current_dialog == NULL;
+	dialog_data->maybe_path = maybe_path;
+	dialog_data->dialog_active = 1;
+	if (have_no_dialog)
+		schedule_new_dialog(location_ui);
+	return dbus_message_new_method_return(msg);
+}
+
 int find_dbus_cb(int unused, DBusMessage * in_msg, location_ui_t * location_ui)
 {
 	int cnt, idx;
