@@ -43,6 +43,7 @@ typedef struct dialog_data_t {
 	GtkWindow *window;
 	char *dbus_object_path;
 	char *foo2;
+	char *path;
 	char *maybe_path;
 	int dialog_response_code;
 	int dialog_active;
@@ -65,8 +66,69 @@ typedef struct location_ui_t {
 } location_ui_t;
 
 /* function declarations */
+static void schedule_new_dialog(location_ui_t * location_ui);
 
 /* variables */
 static DBusObjectPathVTable vtable;
 static DBusObjectPathVTable find_callback_vtable;
 static struct dialog_data_t funcmap[7];
+
+void schedule_new_dialog(location_ui_t * location_ui)
+{
+	return;
+}
+
+int main(int argc, char **argv, char **envp)
+{
+	int cnt = 0, prevcnt = 0, funccnt = 0;
+	const char *path;
+	location_ui_t location_ui;
+
+	setlocale(LC_ALL, "");
+	bindtextdomain("osso-location-ui", "/usr/share/locale");
+	bind_textdomain_codeset("osso-location-ui", "UTF-8");
+	textdomain("osso-location-ui");
+	gtk_init(&argc, &argv);
+
+	location_ui.dialogs = NULL;
+	location_ui.current_dialog = NULL;
+	location_ui.dbus = NULL;
+	location_ui.inactivity_timeout_id = 0;
+
+	location_ui.dbus = dbus_bus_get(DBUS_BUS_SYSTEM, NULL);
+	if (!location_ui.dbus) {
+		g_printerr("Failed to init DBus\n");
+		return 1;
+	}
+
+	dbus_connection_setup_with_g_main(location_ui.dbus, NULL);
+	if (dbus_bus_request_name(location_ui.dbus, LUI_DBUS_NAME, 0, NULL) !=
+	    1) {
+		g_printerr
+		    ("Failed to register service '%s'. Already running?\n",
+		     LUI_DBUS_NAME);
+		return 1;
+	}
+
+	if (!dbus_connection_register_object_path
+	    (location_ui.dbus, LUI_DBUS_PATH, &vtable, &location_ui)) {
+		g_printerr("Failed to register object\n");
+		return 1;
+	}
+
+	do {
+		location_ui.dialogs =
+		    g_list_append(location_ui.dialogs, &funcmap[prevcnt]);
+		++cnt;
+		path = funcmap[funccnt].path;
+		++funccnt;
+		dbus_connection_register_object_path(location_ui.dbus, path,
+						     &find_callback_vtable,
+						     &location_ui);
+		prevcnt = cnt;
+	} while (cnt != 7);
+
+	schedule_new_dialog(&location_ui);
+	gtk_main();
+	return 0;
+}
