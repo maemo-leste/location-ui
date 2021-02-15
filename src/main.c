@@ -66,6 +66,7 @@ typedef struct location_ui_t {
 } location_ui_t;
 
 /* function declarations */
+static int compare_dialog_path(location_ui_t *, const char *);
 static int on_inactivity_timeout(location_ui_t *);
 static void on_dialog_response(GtkWidget *, int, location_ui_t *);
 static location_ui_dialog *find_next_dialog(location_ui_t *);
@@ -75,6 +76,11 @@ static void schedule_new_dialog(location_ui_t *);
 static DBusObjectPathVTable vtable;
 static DBusObjectPathVTable find_callback_vtable;
 static struct dialog_data_t funcmap[7];
+
+int compare_dialog_path(location_ui_t * location_ui, const char *path)
+{
+	return strcmp((const char *)location_ui->current_dialog, path);
+}
 
 int on_inactivity_timeout(location_ui_t * location_ui)
 {
