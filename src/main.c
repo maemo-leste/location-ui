@@ -66,6 +66,7 @@ typedef struct location_ui_t {
 } location_ui_t;
 
 /* function declarations */
+static GtkWidget *create_default_supl_dialog(DBusMessage *, DBusError *);
 static GtkWidget *create_bt_disabled_dialog(void);
 static DBusMessage *location_ui_close_dialog(location_ui_t *, GList *,
 					     DBusMessage *);
@@ -85,11 +86,30 @@ static struct dialog_data_t funcmap[7];
 static DBusMessage *(*display_close_map[2])() =
     { location_ui_close_dialog, location_ui_display_dialog };
 
+GtkWidget *create_default_supl_dialog(DBusMessage * msg, DBusError * err)
+{
+	GtkWidget *ret;
+	char *res, *text;
+	gchar *text_dup;
+
+	if (!dbus_message_get_args
+	    (msg, err, DBUS_TYPE_STRING, &res, DBUS_TYPE_INVALID))
+		return NULL;
+
+	text = dcgettext(NULL, "loca_in_default_supl_used", LC_MESSAGES);
+	text_dup = g_strdup_printf(text, res);
+	ret = hildon_note_new_information(NULL, text_dup);
+	g_free(text_dup);
+	return ret;
+
+}
+
 GtkWidget *create_bt_disabled_dialog(void)
 {
-	return hildon_note_new_information(0, dcgettext("osso-connectivity-ui",
-							"conn_ib_not_available_bt_off",
-							LC_MESSAGES));
+	return hildon_note_new_information(NULL,
+					   dcgettext("osso-connectivity-ui",
+						     "conn_ib_not_available_bt_off",
+						     LC_MESSAGES));
 }
 
 int compare_dialog_path(location_ui_t * location_ui, const char *path)
@@ -170,8 +190,7 @@ DBusMessage *location_ui_display_dialog(location_ui_t * location_ui,
 		return dbus_message_new_error_printf(msg,
 						     "com.nokia.Location.UI.Error.InUse",
 						     "%d",
-						     dialog_data->
-						     dialog_response_code);
+						     dialog_data->dialog_response_code);
 
 	have_no_dialog = location_ui->current_dialog == NULL;
 	dialog_data->maybe_path = maybe_path;
