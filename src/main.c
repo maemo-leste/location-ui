@@ -66,6 +66,8 @@ typedef struct location_ui_t {
 } location_ui_t;
 
 /* function declarations */
+static GtkWidget *create_privacy_verification_dialog(DBusMessage *,
+						     DBusError *);
 static GtkWidget *create_privacy_information_dialog(DBusMessage *, DBusError *);
 static GtkWidget *create_privacy_timeout_dialog(DBusMessage *, DBusError *);
 static GtkWidget *create_privacy_expired_dialog(DBusMessage *, DBusError *);
@@ -89,9 +91,61 @@ static struct dialog_data_t funcmap[7];
 static DBusMessage *(*display_close_map[2])() =
     { location_ui_close_dialog, location_ui_display_dialog };
 
+GtkWidget *create_privacy_verification_dialog(DBusMessage * msg,
+					      DBusError * err)
+{
+	GtkWidget *ret;
+	int accepted;
+	char **arr;
+	int arrlen;
+	char *text, *unk_text;
+	gchar *text_dup;
+
+	if (!dbus_message_get_args
+	    (msg, err, DBUS_TYPE_INT32, &accepted, DBUS_TYPE_ARRAY,
+	     DBUS_TYPE_STRING, &arr, &arrlen, DBUS_TYPE_INVALID))
+		return NULL;
+
+	if (arrlen != 2) {
+		dbus_set_error(err, "org.freedesktop.DBus.Error.Failed",
+			       "Provide requestor and client");
+		return NULL;
+	}
+
+	switch (accepted) {
+	case 0:
+		text =
+		    dcgettext(NULL, "loca_nc_request_default_reject",
+			      LC_MESSAGES);
+		break;
+	case 1:
+		text =
+		    dcgettext(NULL, "loca_nc_request_default_accept",
+			      LC_MESSAGES);
+		break;
+	case -1:
+		text =
+		    dcgettext(NULL, "loca_nc_request_no_default", LC_MESSAGES);
+		break;
+	default:
+		return NULL;
+	}
+
+	/* TODO: review */
+	if (**arr)
+		unk_text = *arr;
+	else
+		unk_text = dcgettext(NULL, "loca_va_unknown", LC_MESSAGES);
+
+	text_dup = g_strdup_printf(text, unk_text);
+	ret = hildon_note_new_confirmation(NULL, text_dup);
+	g_free(text_dup);
+	return ret;
+}
+
 GtkWidget *create_privacy_information_dialog(DBusMessage * msg, DBusError * err)
 {
-	GtkWidget *ret = NULL;
+	GtkWidget *ret;
 	int unused;
 	char **arr;
 	int arrlen;
@@ -125,7 +179,7 @@ GtkWidget *create_privacy_information_dialog(DBusMessage * msg, DBusError * err)
 
 GtkWidget *create_privacy_timeout_dialog(DBusMessage * msg, DBusError * err)
 {
-	GtkWidget *ret = NULL;
+	GtkWidget *ret;
 	int accepted;
 	char **arr;
 	int arrlen;
@@ -289,7 +343,8 @@ DBusMessage *location_ui_display_dialog(location_ui_t * location_ui,
 		return dbus_message_new_error_printf(msg,
 						     "com.nokia.Location.UI.Error.InUse",
 						     "%d",
-						     dialog_data->dialog_response_code);
+						     dialog_data->
+						     dialog_response_code);
 
 	have_no_dialog = location_ui->current_dialog == NULL;
 	dialog_data->maybe_path = maybe_path;
