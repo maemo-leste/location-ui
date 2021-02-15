@@ -66,6 +66,7 @@ typedef struct location_ui_t {
 } location_ui_t;
 
 /* function declarations */
+static GtkWidget *create_privacy_timeout_dialog(DBusMessage *, DBusError *);
 static GtkWidget *create_privacy_expired_dialog(DBusMessage *, DBusError *);
 static GtkWidget *create_default_supl_dialog(DBusMessage *, DBusError *);
 static GtkWidget *create_bt_disabled_dialog(void);
@@ -87,9 +88,46 @@ static struct dialog_data_t funcmap[7];
 static DBusMessage *(*display_close_map[2])() =
     { location_ui_close_dialog, location_ui_display_dialog };
 
-GtkWidget *create_privacy_expired_dialog(DBusMessage * msg, DBusError * err)
+GtkWidget *create_privacy_timeout_dialog(DBusMessage * msg, DBusError * err)
 {
 	GtkWidget *ret = NULL;
+	int accepted;
+	char **arr;
+	int arrlen;
+	char *text, *first_arr_entry;
+	gchar *text_dup;
+
+	if (!dbus_message_get_args
+	    (msg, err, DBUS_TYPE_INT32, &accepted, DBUS_TYPE_ARRAY,
+	     DBUS_TYPE_STRING, &arr, &arrlen, DBUS_TYPE_INVALID))
+		return NULL;
+
+	if (arrlen != 2) {
+		dbus_set_error(err, "org.freedesktop.DBus.Error.Failed",
+			       "Provide requestor and client");
+		return NULL;
+	}
+
+	if (accepted)
+		text = dcgettext(NULL, "loca_ni_accepted", LC_MESSAGES);
+	else
+		text = dcgettext(NULL, "loca_ni_rejected", LC_MESSAGES);
+
+	/* TODO: review */
+	if (**arr)
+		first_arr_entry = *arr;
+	else
+		first_arr_entry =
+		    dcgettext(NULL, "loca_va_unknown", LC_MESSAGES);
+
+	text_dup = g_strdup_printf(text, first_arr_entry);
+	ret = hildon_note_new_information(NULL, text_dup);
+	g_free(text_dup);
+	return ret;
+}
+
+GtkWidget *create_privacy_expired_dialog(DBusMessage * msg, DBusError * err)
+{
 	gboolean accepted;
 	char **arr;
 	int arrlen;
