@@ -89,7 +89,34 @@ void on_dialog_response(GtkWidget * dialog, int gtk_response,
 
 location_ui_dialog *find_next_dialog(location_ui_t * location_ui)
 {
-	return NULL;
+	GList *dialog;
+	location_ui_dialog *next_dialog, *v4;
+	gint32 cur_priority;
+
+	dialog = location_ui->dialogs;
+	if (!dialog)
+		return NULL;
+
+	next_dialog = NULL;
+	/* I think this should be -1 */
+	cur_priority = 0x80000000;
+
+	do {
+		while (1) {
+			v4 = (location_ui_dialog *) dialog->data;
+			if (v4->state == STATE_QUEUE)
+				break;
+			dialog = (GList *) dialog[1].data;
+			if (!dialog)
+				return next_dialog;
+		}
+		dialog = (GList *) dialog[1].data;
+		if (v4->maybe_priority > cur_priority) {
+			next_dialog = v4;
+			cur_priority = v4->maybe_priority;
+		}
+	} while (dialog);
+	return next_dialog;
 }
 
 void schedule_new_dialog(location_ui_t * location_ui)
