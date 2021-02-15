@@ -66,16 +66,82 @@ typedef struct location_ui_t {
 } location_ui_t;
 
 /* function declarations */
-static void schedule_new_dialog(location_ui_t * location_ui);
+static int on_inactivity_timeout(location_ui_t *);
+static void on_dialog_response(GtkWidget *, int, location_ui_t *);
+static location_ui_dialog *find_next_dialog(location_ui_t *);
+static void schedule_new_dialog(location_ui_t *);
 
 /* variables */
 static DBusObjectPathVTable vtable;
 static DBusObjectPathVTable find_callback_vtable;
 static struct dialog_data_t funcmap[7];
 
-void schedule_new_dialog(location_ui_t * location_ui)
+int on_inactivity_timeout(location_ui_t * location_ui)
+{
+	return 0;
+}
+
+void on_dialog_response(GtkWidget * dialog, int gtk_response,
+			location_ui_t * location_ui)
 {
 	return;
+}
+
+location_ui_dialog *find_next_dialog(location_ui_t * location_ui)
+{
+	return NULL;
+}
+
+void schedule_new_dialog(location_ui_t * location_ui)
+{
+	location_ui_dialog *dialog;
+	char *destroy_data;
+	int dialog_instance;
+	gboolean dialog_instantiated;
+
+	if (location_ui->current_dialog)
+		g_assert("location_ui->current_dialog == NULL");
+
+	dialog = find_next_dialog(location_ui);
+	location_ui->current_dialog = dialog;
+	if (dialog) {
+		if (dialog->state != STATE_QUEUE)
+			g_assert
+			    ("location_ui->current_dialog->state == STATE_QUEUE");
+
+		destroy_data = dialog->maybe_dialog_instance;
+		dialog_instantiated = dialog->maybe_dialog_instance == NULL;
+		dialog->state = STATE_2;
+		if (dialog_instantiated) {
+			if (!dialog->get_instance)
+				g_assert
+				    ("location_ui->current_dialog->get_instance != NULL");
+
+			dialog_instance = dialog->get_instance();
+			/* TODO: check this cast */
+			dialog->maybe_dialog_instance = (char *)dialog_instance;
+			g_object_set_data(G_OBJECT(location_ui->current_dialog),
+					  "dialog-data",
+					  location_ui->current_dialog);
+			g_signal_connect_data(location_ui->current_dialog,
+					      "response",
+					      (GCallback) on_dialog_response,
+					      location_ui,
+					      (GClosureNotify) destroy_data,
+					      (GConnectFlags) destroy_data);
+		}
+
+		gtk_window_present(GTK_WINDOW(location_ui->current_dialog));
+		if (location_ui->inactivity_timeout_id) {
+			g_source_remove(location_ui->inactivity_timeout_id);
+			location_ui->inactivity_timeout_id = 0;
+		}
+	} else if (!location_ui->inactivity_timeout_id) {
+		location_ui->inactivity_timeout_id = g_timeout_add(15000u,
+								   (GSourceFunc)
+								   on_inactivity_timeout,
+								   location_ui);
+	}
 }
 
 int main(int argc, char **argv, char **envp)
