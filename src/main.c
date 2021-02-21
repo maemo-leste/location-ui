@@ -42,7 +42,7 @@ enum {
 typedef struct dialog_data_t {
 	GtkWindow *window;
 	char *dbus_object_path;
-	char *foo2;
+	void *maybe_func;
 	char *path;
 	char *maybe_path;
 	int dialog_response_code;
@@ -93,7 +93,25 @@ static void schedule_new_dialog(location_ui_t *);
 /* variables */
 static DBusObjectPathVTable vtable;
 static DBusObjectPathVTable find_callback_vtable;
-static struct dialog_data_t funcmap[7];
+
+#define UI_BT_DISCONNECTED_PATH "/com/nokia/location/ui/bt_disconnected"
+#define UI_DISLAIMER_PATH "/com/nokia/location/ui/disclaimer"
+#define UI_ENABLE_GPS_PATH "/com/nokia/location/ui/enable_gps"
+#define UI_ENABLE_NETWORK_PATH "/com/nokia/location/ui/enable_network"
+#define UI_ENABLE_POSITIONING_PATH "/com/nokia/location/ui/enable_positioning"
+#define UI_ENABLE_AGNSS_PATH "/com/nokia/location/ui/enable_agnss"
+#define UI_BT_DISABLED "/com/nokia/location/ui/bt_disabled"
+
+static struct dialog_data_t funcmap[7] = {
+    {NULL, NULL, create_bt_disconnect_dialog, UI_BT_DISCONNECTED_PATH, 0, 0xFFFFFFFF, 0},
+    {NULL, NULL, create_disclaimer_dialog, UI_DISLAIMER_PATH, 0, 0xFFFFFFFF, 0},
+    {NULL, NULL, create_enable_gps_dialog, UI_ENABLE_GPS_PATH, 0, 0xFFFFFFFF, 0},
+    {NULL, NULL, create_enable_network_dialog, UI_ENABLE_NETWORK_PATH, 0, 0xFFFFFFFF, 0},
+    {NULL, NULL, create_positioning_dialog, UI_ENABLE_POSITIONING_PATH, 0, 0xFFFFFFFF, 0},
+    {NULL, NULL, create_agnss_dialog, UI_ENABLE_AGNSS_PATH, 0, 0xFFFFFFFF, 0},
+    {NULL, NULL, create_bt_disconnect_dialog, UI_BT_DISABLED, 0, 0xFFFFFFFF, 0},
+};
+
 static DBusMessage *(*display_close_map[2])() =
     { location_ui_close_dialog, location_ui_display_dialog };
 
@@ -396,7 +414,7 @@ DBusMessage *location_ui_close_dialog(location_ui_t * location_ui, GList * list,
 		dialog_data->window = NULL;
 	}
 
-	if (dialog_data->foo2) {
+	if (dialog_data->maybe_func) {
 		dialog_data->dialog_active = 0;
 		dialog_data->maybe_path = 0;
 		dialog_data->dialog_response_code = -1;
