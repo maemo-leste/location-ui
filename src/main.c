@@ -21,96 +21,13 @@
 #include <libintl.h>
 #include <stdlib.h>
 
-#include <dbus/dbus.h>
-#include <dbus/dbus-glib-lowlevel.h>
-#include <glib.h>
-#include <gtk/gtk.h>
+#include "main.h"
 
-#include <hildon/hildon.h>
-
-/* enums */
 #define LUI_DBUS_NAME    "com.nokia.Location.UI"
 #define LUI_DBUS_DIALOG  LUI_DBUS_NAME".Dialog"
 #define LUI_DBUS_PATH    "/com/nokia/location/ui"
 
-enum {
-	STATE_0,
-	STATE_QUEUE,
-	STATE_2,
-};
 
-typedef struct dialog_data_t {
-	GtkWindow *window;
-	char *dbus_object_path;
-	void *maybe_func;
-	char *path;
-	char *maybe_path;
-	int dialog_response_code;
-	int dialog_active;
-} dialog_data_t;
-
-typedef struct location_ui_dialog {
-	char *maybe_dialog_instance;
-	const char *path;
-	int (*get_instance)(void);
-	int maybe_priority;
-	int int_ffffffff_everywhere;
-	int state;
-} location_ui_dialog;
-
-typedef struct location_ui_t {
-	GList *dialogs;
-	gpointer current_dialog;
-	DBusConnection *dbus;
-	guint inactivity_timeout_id;
-} location_ui_t;
-
-/* function declarations */
-static GtkWidget *create_disclaimer_dialog(void);
-static GtkWidget *create_positioning_dialog(void);
-static GtkWidget *create_enable_gps_dialog(void);
-static GtkWidget *create_enable_network_dialog(void);
-static GtkWidget *create_agnss_dialog(void);
-static GtkWidget *create_bt_disconnect_dialog(void);
-static GtkWidget *create_privacy_verification_dialog(DBusMessage *,
-						     DBusError *);
-static GtkWidget *create_privacy_information_dialog(DBusMessage *, DBusError *);
-static GtkWidget *create_privacy_timeout_dialog(DBusMessage *, DBusError *);
-static GtkWidget *create_privacy_expired_dialog(DBusMessage *, DBusError *);
-static GtkWidget *create_default_supl_dialog(DBusMessage *, DBusError *);
-static GtkWidget *create_bt_disabled_dialog(void);
-static DBusMessage *location_ui_close_dialog(location_ui_t *, GList *,
-					     DBusMessage *);
-static DBusMessage *location_ui_display_dialog(location_ui_t *, GList *,
-					       DBusMessage *);
-static int compare_dialog_path(location_ui_t *, const char *);
-static int find_dbus_cb(int, DBusMessage *, location_ui_t *);
-static int on_inactivity_timeout(location_ui_t *);
-static void on_dialog_response(GtkWidget *, int, location_ui_t *);
-static location_ui_dialog *find_next_dialog(location_ui_t *);
-static void schedule_new_dialog(location_ui_t *);
-
-/* variables */
-static DBusObjectPathVTable vtable;
-static DBusObjectPathVTable find_callback_vtable;
-
-#define UI_BT_DISCONNECTED_PATH "/com/nokia/location/ui/bt_disconnected"
-#define UI_DISLAIMER_PATH "/com/nokia/location/ui/disclaimer"
-#define UI_ENABLE_GPS_PATH "/com/nokia/location/ui/enable_gps"
-#define UI_ENABLE_NETWORK_PATH "/com/nokia/location/ui/enable_network"
-#define UI_ENABLE_POSITIONING_PATH "/com/nokia/location/ui/enable_positioning"
-#define UI_ENABLE_AGNSS_PATH "/com/nokia/location/ui/enable_agnss"
-#define UI_BT_DISABLED "/com/nokia/location/ui/bt_disabled"
-
-static struct dialog_data_t funcmap[7] = {
-    {NULL, NULL, create_bt_disconnect_dialog, UI_BT_DISCONNECTED_PATH, 0, 0xFFFFFFFF, 0},
-    {NULL, NULL, create_disclaimer_dialog, UI_DISLAIMER_PATH, 0, 0xFFFFFFFF, 0},
-    {NULL, NULL, create_enable_gps_dialog, UI_ENABLE_GPS_PATH, 0, 0xFFFFFFFF, 0},
-    {NULL, NULL, create_enable_network_dialog, UI_ENABLE_NETWORK_PATH, 0, 0xFFFFFFFF, 0},
-    {NULL, NULL, create_positioning_dialog, UI_ENABLE_POSITIONING_PATH, 0, 0xFFFFFFFF, 0},
-    {NULL, NULL, create_agnss_dialog, UI_ENABLE_AGNSS_PATH, 0, 0xFFFFFFFF, 0},
-    {NULL, NULL, create_bt_disconnect_dialog, UI_BT_DISABLED, 0, 0xFFFFFFFF, 0},
-};
 
 static DBusMessage *(*display_close_map[2])() =
     { location_ui_close_dialog, location_ui_display_dialog };
@@ -403,8 +320,7 @@ DBusMessage *location_ui_close_dialog(location_ui_t * location_ui, GList * list,
 	if (dialog_data->window) {
 		if (HILDON_IS_NOTE(dialog_data->window)) {
 			note_type = 0;
-			g_object_get(G_OBJECT(dialog_data->window), "note-type",
-				     &note_type, 0);
+			g_object_get(G_OBJECT(dialog_data->window), "note-type", &note_type, NULL);
 			if ((unsigned int)(note_type - 2) > 1)
 				gtk_widget_destroy(GTK_WIDGET
 						   (dialog_data->window));
@@ -416,7 +332,7 @@ DBusMessage *location_ui_close_dialog(location_ui_t * location_ui, GList * list,
 
 	if (dialog_data->maybe_func) {
 		dialog_data->dialog_active = 0;
-		dialog_data->maybe_path = 0;
+		dialog_data->some_dbus_arg = 0;
 		dialog_data->dialog_response_code = -1;
 	} else {
 		dialogs = g_list_delete_link(location_ui->dialogs, list);
@@ -443,16 +359,16 @@ DBusMessage *location_ui_display_dialog(location_ui_t * location_ui,
 	dialog_data_t *dialog_data;
 	int dialog_active_or_in_use;
 	gboolean have_no_dialog;
-	char *maybe_path;
+	int some_dbus_arg;
 
-	/* TODO: Review maybe_path */
+	/* TODO: Review some_dbus_arg */
 	dbus_ret =
-	    dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &maybe_path,
+	    dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &some_dbus_arg,
 				  DBUS_TYPE_INVALID);
 	dialog_data = list->data;
 	dialog_active_or_in_use = dialog_data->dialog_active;
 	if (!dbus_ret)
-		maybe_path = 0;
+		some_dbus_arg = 0;
 	if (dialog_active_or_in_use)
 		return dbus_message_new_error_printf(msg,
 						     "com.nokia.Location.UI.Error.InUse",
@@ -460,20 +376,22 @@ DBusMessage *location_ui_display_dialog(location_ui_t * location_ui,
 						     dialog_data->dialog_response_code);
 
 	have_no_dialog = location_ui->current_dialog == NULL;
-	dialog_data->maybe_path = maybe_path;
+	dialog_data->some_dbus_arg = some_dbus_arg;
 	dialog_data->dialog_active = 1;
 	if (have_no_dialog)
 		schedule_new_dialog(location_ui);
 	return dbus_message_new_method_return(msg);
 }
 
-int find_dbus_cb(int unused, DBusMessage * in_msg, location_ui_t * location_ui)
+DBusHandlerResult find_dbus_cb(DBusConnection *conn, DBusMessage * in_msg, void* data)
 {
 	int cnt, idx;
 	const char *member, *message_path;
 	GList *dialog_entry;
 	gboolean found;
 	DBusMessage *out_msg;
+
+	location_ui_t* location_ui = (location_ui_t*)data;
 
 	cnt = 0;
 	member = dbus_message_get_member(in_msg);
@@ -623,7 +541,7 @@ location_ui_dialog *find_next_dialog(location_ui_t * location_ui)
 void schedule_new_dialog(location_ui_t * location_ui)
 {
 	location_ui_dialog *dialog;
-	char *destroy_data;
+	int destroy_data;
 	int dialog_instance;
 	gboolean dialog_instantiated;
 
@@ -638,7 +556,7 @@ void schedule_new_dialog(location_ui_t * location_ui)
 			    ("location_ui->current_dialog->state == STATE_QUEUE");
 
 		destroy_data = dialog->maybe_dialog_instance;
-		dialog_instantiated = dialog->maybe_dialog_instance == NULL;
+		dialog_instantiated = dialog->maybe_dialog_instance == 0;
 		dialog->state = STATE_2;
 		if (dialog_instantiated) {
 			if (!dialog->get_instance)
@@ -646,8 +564,7 @@ void schedule_new_dialog(location_ui_t * location_ui)
 				    ("location_ui->current_dialog->get_instance != NULL");
 
 			dialog_instance = dialog->get_instance();
-			/* TODO: check this cast */
-			dialog->maybe_dialog_instance = (char *)dialog_instance;
+			dialog->maybe_dialog_instance = dialog_instance;
 			g_object_set_data(G_OBJECT(location_ui->current_dialog),
 					  "dialog-data",
 					  location_ui->current_dialog);
@@ -655,6 +572,7 @@ void schedule_new_dialog(location_ui_t * location_ui)
 					      "response",
 					      (GCallback) on_dialog_response,
 					      location_ui,
+						  /* TODO: this seems wrong */
 					      (GClosureNotify) destroy_data,
 					      (GConnectFlags) destroy_data);
 		}
@@ -670,6 +588,75 @@ void schedule_new_dialog(location_ui_t * location_ui)
 								   on_inactivity_timeout,
 								   location_ui);
 	}
+}
+
+DBusHandlerResult on_client_request(DBusConnection *conn, DBusMessage *msg, void* data)
+{
+  return 0; /* TODO */
+#if 0
+  int vtable_idx;
+  const char *v5;
+  int v7;
+  dialog_data *v8;
+  dialog_data *dialog;
+  char *dialog_path;
+  GList *new_dialogs;
+  char *dbus_path;
+  GObject *v13;
+  DBusMessage *new_msg;
+  DBusMessage *method_call;
+  DBusError error;
+
+  location_ui = (location_ui_t*)data;
+
+  method_call = msg;
+  vtable_idx = 0;
+  v5 = dbus_message_get_member(msg);
+  while ( !g_str_equal(v5, (&create_dialog_vtable)[2 * vtable_idx]) )
+  {
+    if ( ++vtable_idx == 5 )
+      return 1;
+  }
+  dbus_error_init(&error);
+  v7 = ((int (__fastcall *)(DBusMessage *, DBusError *))(&create_dialog_vtable)[2 * vtable_idx + 1])(
+         method_call,
+         &error);
+  if ( v7 )
+  {
+    if ( dbus_error_is_set(&error) )
+      g_assertion_message_expr(0, "main.c", 466, "on_client_request", "!dbus_error_is_set (&error)");
+    v8 = (dialog_data *)g_slice_alloc0(0x18u);
+    ++locui[1].dialogs;                         // not sure what this does
+    dialog = v8;
+    v8->window = (GtkWindow *)v7;
+    dialog_path = g_strdup_printf("/com/nokia/location/ui/dialog%d");
+    dialog->dialog_active = 0;
+    dialog->dialog_response_code = -1;
+    dialog->dbus_object_path = dialog_path;
+    new_dialogs = g_list_append(locui->dialogs, dialog);
+    dbus_path = dialog->dbus_object_path;
+    locui->dialogs = new_dialogs;
+    dbus_connection_register_object_path(locui->dbus, dbus_path, &find_callback_vtable, locui);
+    v13 = (GObject *)g_type_check_instance_cast(
+                       &dialog->window->bin.container.widget.object.parent_instance.g_type_instance,
+                       0x50u);
+    g_object_set_data(v13, "dialog-data", dialog);
+    g_signal_connect_data(dialog->window, "response", (GCallback)on_dialog_response, locui, 0, 0);
+    new_msg = dbus_message_new_method_return(method_call);
+    dbus_message_append_args(new_msg, 111, &dialog->dbus_object_path, 0);
+  }
+  else
+  {
+    if ( !dbus_error_is_set(&error) )
+      g_assertion_message_expr(0, "main.c", 490, "on_client_request", "dbus_error_is_set (&error)");
+    new_msg = dbus_message_new_error(method_call, error.name, error.message);
+    dbus_error_free(&error);
+  }
+  dbus_connection_send(locui->dbus, new_msg, 0);
+  dbus_connection_flush(locui->dbus);
+  dbus_message_unref(new_msg);
+  return 0;
+#endif
 }
 
 int main(int argc, char **argv, char **envp)
