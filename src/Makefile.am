@@ -1,6 +1,7 @@
 libexec_PROGRAMS = location-ui
 
 location_ui_CFLAGS = \
+    -Wall -ggdb \
     $(UI_CFLAGS) \
 	$(MAEMO_LAUNCHER_CFLAGS)
 
