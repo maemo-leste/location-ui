@@ -28,12 +28,6 @@
 #define LUI_DBUS_PATH    "/com/nokia/location/ui"
 
 
-
-static display_map_t display_close_map[2] = {
-    {"display", location_ui_close_dialog},
-    {"close", location_ui_display_dialog }
-};
-
 GtkWidget *create_disclaimer_dialog(void)
 {
 	char *disclaimer_text, *disclaimer_ok, *disclaimer_reject;
@@ -505,13 +499,14 @@ void on_dialog_response(GtkWidget * dialog, int gtk_response,
 
 location_ui_dialog *find_next_dialog(location_ui_t * location_ui)
 {
-	GList *dialog;
-	location_ui_dialog *next_dialog, *v4;
+	location_ui_dialog *next_dialog, *tmp_dialog;
 	gint32 cur_priority;
+    GList* dialog_list;
 
-	dialog = location_ui->dialogs;
-	if (!dialog)
+	dialog_list = location_ui->dialogs;
+	if (!dialog_list) {
 		return NULL;
+    }
 
 	next_dialog = NULL;
 	/* I think this should be -1 */
@@ -519,19 +514,20 @@ location_ui_dialog *find_next_dialog(location_ui_t * location_ui)
 
 	do {
 		while (1) {
-			v4 = (location_ui_dialog *) dialog->data;
-			if (v4->state == STATE_QUEUE)
+			tmp_dialog = (location_ui_dialog *) dialog_list->data;
+			if (tmp_dialog->state == STATE_QUEUE)
 				break;
-			dialog = (GList *) dialog[1].data;
-			if (!dialog)
+            dialog_list = g_list_next(dialog_list);
+			if (!dialog_list) {
 				return next_dialog;
+            }
 		}
-		dialog = (GList *) dialog[1].data;
-		if (v4->maybe_priority > cur_priority) {
-			next_dialog = v4;
-			cur_priority = v4->maybe_priority;
+        dialog_list = g_list_next(dialog_list);
+		if (tmp_dialog->maybe_priority > cur_priority) {
+			next_dialog = tmp_dialog;
+			cur_priority = tmp_dialog->maybe_priority;
 		}
-	} while (dialog);
+	} while (dialog_list);
 	return next_dialog;
 }
 
