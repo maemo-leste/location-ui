@@ -29,8 +29,10 @@
 
 
 
-static DBusMessage *(*display_close_map[2])() =
-    { location_ui_close_dialog, location_ui_display_dialog };
+static display_map_t display_close_map[2] = {
+    {"display", location_ui_close_dialog},
+    {"close", location_ui_display_dialog }
+};
 
 GtkWidget *create_disclaimer_dialog(void)
 {
@@ -397,9 +399,8 @@ DBusHandlerResult find_dbus_cb(DBusConnection *conn, DBusMessage * in_msg, void*
 	member = dbus_message_get_member(in_msg);
 	message_path = dbus_message_get_path(in_msg);
 	while (1) {
-		/* TODO: review */
-		found = g_str_equal(member, (&display_close_map)[2 * cnt]);
-		idx = 2 * cnt++;
+		found = g_str_equal(member, display_close_map[cnt].text);
+		idx = cnt++;
 		if (found)
 			break;
 		if (cnt == 2)
@@ -409,13 +410,9 @@ DBusHandlerResult find_dbus_cb(DBusConnection *conn, DBusMessage * in_msg, void*
 	dialog_entry = g_list_find_custom(location_ui->dialogs, message_path,
 					  (GCompareFunc) compare_dialog_path);
 	if (dialog_entry) {
-		/* TODO: Review */
-		out_msg =
-		    display_close_map[idx + 1] (location_ui, dialog_entry,
-						in_msg);
-	} else {
-		out_msg =
-		    dbus_message_new_error(in_msg,
+		out_msg = display_close_map[idx].func(location_ui, dialog_entry, in_msg);
+    } else {
+		out_msg = dbus_message_new_error(in_msg,
 					   "org.freedesktop.DBus.Error.Failed",
 					   "Bad object");
 	}

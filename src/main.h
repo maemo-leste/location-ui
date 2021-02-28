@@ -39,6 +39,12 @@ typedef struct client_request_table {
     void* func; /* TODO: specify this as GtkWidget* (void) or so */
 } client_request_table;
 
+typedef DBusMessage* (*display_cbfunc)(location_ui_t *, GList *, DBusMessage *);
+
+typedef struct display_map_t {
+    char* text;
+    display_cbfunc func;
+} display_map_t;
 
 /* TODO: Figure out the different states */
 enum {
@@ -104,6 +110,10 @@ static struct client_request_table clireq_table [5] = {
 static DBusObjectPathVTable vtable = {NULL, on_client_request, NULL, NULL, NULL, NULL};
 static DBusObjectPathVTable find_callback_vtable = {NULL, find_dbus_cb, NULL, NULL, NULL, NULL};
 
+static display_map_t display_close_map[2] = {
+    {"display", location_ui_close_dialog},
+    {"close", location_ui_display_dialog }
+};
 
 
 #endif /* _LOCATION_UI_MAIN_H */
