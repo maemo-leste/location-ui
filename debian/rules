@@ -2,13 +2,15 @@
 
 OPTS = ""
 
+TARG_MULTIARCH = $(shell dpkg-architecture -q DEB_TARGET_MULTIARCH)
+
 ifeq (,$(findstring nolauncher,$(DEB_BUILD_OPTIONS)))
 	OPTS += "--enable-maemo-launcher=yes"
 	USE_MAEMO_LAUNCHER = true
 endif
 
 %:
-	dh $@
+	dh $@ -- --with-autoreconf
 
 override_dh_auto_configure:
 	dh_auto_configure -- $(OPTS)

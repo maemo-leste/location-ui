@@ -1,4 +1,4 @@
 [D-BUS Service]
 Name=com.nokia.Location.UI
-Exec=/usr/libexec/location-ui
+Exec=/usr/libexec/location-ui.launch
 User=user

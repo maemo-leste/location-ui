@@ -1,21 +1,25 @@
 Source: location-ui
+Section: libs
 Priority: optional
 Maintainer: Ivan J. <parazyd@dyne.org>
 Build-Depends:
- debhelper (>= 12),
+ debhelper-compat (= 12),
+ libtool,
  libdbus-1-dev,
  libhildon1-dev,
  libgtk2.0-dev,
  libglib2.0-dev,
  libdbus-glib-1-dev,
  maemo-launcher-dev,
+Standards-Version: 4.3.0
+Vcs-Git: https://github.com/maemo-leste/location-ui
+Vcs-Browser: https://github.com/maemo-leste/location-ui
 
 Package: location-ui
-Section: libs
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${launcher:Depends},
  osso-connectivity-ui-l10n-mr0,
- osso-location-ui-l10n-mr0
+ osso-location-ui-l10n-mr0,
  hildon-libs-l10n-mr0,
 Description: Location UI
  User interface dialogs etc. related to location framework.
