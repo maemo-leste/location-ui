@@ -340,8 +340,7 @@ DBusMessage *location_ui_close_dialog(location_ui_t * location_ui, GList * list,
 		g_slice_free1(24u, dialog_data);	/* TODO: (sizeof(dialog_data), dialog_data) ? */
 	}
 	if (dialog_active == 2) {
-		if (location_ui->current_dialog != dialog_data)
-			g_assert("location_ui->current_dialog == dialog_data");
+		g_assert(location_ui->current_dialog == dialog_data);
 		location_ui->current_dialog = NULL;
 		schedule_new_dialog(location_ui);
 	}
@@ -419,10 +418,8 @@ DBusHandlerResult find_dbus_cb(DBusConnection *conn, DBusMessage * in_msg, void*
 
 int on_inactivity_timeout(location_ui_t * location_ui)
 {
-	if (location_ui->current_dialog)
-		g_assert("location_ui->current_dialog == NULL");
-	if (find_next_dialog(location_ui))
-		g_assert("find_next_dialog(location_ui) == NULL");
+	g_assert(location_ui->current_dialog == NULL);
+	g_assert(find_next_dialog(location_ui) == NULL);
 	gtk_main_quit();
 	return 0;
 }
@@ -440,8 +437,7 @@ void on_dialog_response(GtkWidget * dialog, int gtk_response,
 	gpointer cur_dialog;
 
 	item = g_object_get_data(G_OBJECT(dialog), "dialog-data");
-	if (!item)
-		g_assert("item != NULL");
+	g_assert(item != NULL);
 
 	item->dialog_response_code = 0;
 	gps_cb_data = g_object_get_data(G_OBJECT(dialog), "gps-cb");
@@ -538,23 +534,18 @@ void schedule_new_dialog(location_ui_t * location_ui)
 	int dialog_instance;
 	gboolean dialog_instantiated;
 
-	if (location_ui->current_dialog)
-		g_assert("location_ui->current_dialog == NULL");
+	g_assert(location_ui->current_dialog == NULL);
 
 	dialog = find_next_dialog(location_ui);
 	location_ui->current_dialog = dialog;
 	if (dialog) {
-		if (dialog->state != STATE_QUEUE)
-			g_assert
-			    ("location_ui->current_dialog->state == STATE_QUEUE");
+		g_assert(location_ui->current_dialog->state == STATE_QUEUE);
 
 		destroy_data = dialog->maybe_dialog_instance;
 		dialog_instantiated = dialog->maybe_dialog_instance == 0;
 		dialog->state = STATE_2;
 		if (dialog_instantiated) {
-			if (!dialog->get_instance)
-				g_assert
-				    ("location_ui->current_dialog->get_instance != NULL");
+			g_assert(location_ui->current_dialog->get_instance != NULL);
 
 			dialog_instance = dialog->get_instance();
 			dialog->maybe_dialog_instance = dialog_instance;

@@ -29,7 +29,7 @@ typedef struct location_ui_dialog {
 
 typedef struct location_ui_t {
 	GList *dialogs;
-	gpointer current_dialog;
+	location_ui_dialog *current_dialog;
 	DBusConnection *dbus;
 	guint inactivity_timeout_id;
 } location_ui_t;
