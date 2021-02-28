@@ -9,4 +9,4 @@ location_ui_LDADD = \
     $(UI_LIBS) \
     $(MAEMO_LAUNCHER_LIBS)
 
-location_ui_SOURCES = main.c main.h
+location_ui_SOURCES = main.c

@@ -16,108 +16,124 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 #include <locale.h>
 #include <libintl.h>
 #include <stdlib.h>
 
-#include "main.h"
+#include <dbus/dbus.h>
+#include <dbus/dbus-glib-lowlevel.h>
+#include <glib.h>
+#include <gtk/gtk.h>
+
+#include <hildon/hildon.h>
+
+/* macros */
+#define nelem(x) (sizeof (x) / sizeof *(x))
 
 #define LUI_DBUS_NAME    "com.nokia.Location.UI"
 #define LUI_DBUS_DIALOG  LUI_DBUS_NAME".Dialog"
 #define LUI_DBUS_PATH    "/com/nokia/location/ui"
 
+/* enums */
+enum {
+	STATE_0,
+	STATE_QUEUE,
+	STATE_2,
+};
 
-GtkWidget *create_disclaimer_dialog(void)
-{
-	char *disclaimer_text, *disclaimer_ok, *disclaimer_reject;
-	char *fi_disclaimer_text;
-	GtkWidget *dialog, *widget_obj, *pan;
+typedef struct location_ui_dialog {
+	char *path;
+	GtkWidget *(*dialog_func)(void);
+	GtkWindow *window;
+	int state;
+	int priority;
+	int dialog_active;
+	int dialog_response_code;
+	int some_dbus_arg;
+} location_ui_dialog;
 
-	disclaimer_text = dcgettext(NULL, "loca_ti_disclaimer", LC_MESSAGES);
-	disclaimer_ok = dcgettext(NULL, "loca_bd_disclaimer_ok", LC_MESSAGES);
-	disclaimer_reject =
-	    dcgettext(NULL, "loca_bd_disclaimer_reject", LC_MESSAGES);
+typedef struct location_ui_t {
+	GList *dialogs;
+	location_ui_dialog *current_dialog;
+	DBusConnection *dbus;
+	guint inactivity_timeout_id;
+} location_ui_t;
 
-	/* TODO: what is 42 below? */
-	dialog = gtk_dialog_new_with_buttons(disclaimer_text, NULL,
-					     GTK_DIALOG_NO_SEPARATOR,
-					     disclaimer_ok, GTK_RESPONSE_OK,
-					     disclaimer_reject, 42, NULL);
+typedef struct client_request_table {
+	char *text;
+	GtkWidget *(*func)(DBusMessage *, DBusError *);
+} client_request_table;
 
-	fi_disclaimer_text = dcgettext(NULL, "loca_fi_disclaimer", LC_MESSAGES);
+typedef struct display_close_map {
+	const char *text;
+	DBusMessage *(*func)(location_ui_t *, GList *, DBusMessage *);
+} display_close_map;
 
-	widget_obj = g_object_new(gtk_label_get_type(), "justify", 0,
-				  "xalign", 0, 0, "yalign", 0, 0, 0, "wrap", 1,
-				  "label", fi_disclaimer_text, NULL);
-	gtk_widget_set_name(widget_obj, "osso-SmallFont");
+/* function declarations */
+static GtkWidget *create_privacy_verification_dialog(DBusMessage *,
+						     DBusError *);
+static GtkWidget *create_privacy_information_dialog(DBusMessage *, DBusError *);
+static GtkWidget *create_privacy_timeout_dialog(DBusMessage *, DBusError *);
+static GtkWidget *create_privacy_expired_dialog(DBusMessage *, DBusError *);
+static GtkWidget *create_default_supl_dialog(DBusMessage *, DBusError *);
+static GtkWidget *create_bt_disconnected_dialog(void);
+static GtkWidget *create_disclaimer_dialog(void);
+static GtkWidget *create_enable_gps_dialog(void);
+static GtkWidget *create_enable_network_dialog(void);
+static GtkWidget *create_positioning_dialog(void);
+static GtkWidget *create_agnss_dialog(void);
+static location_ui_dialog *find_next_dialog(location_ui_t *);
+static int on_inactivity_timeout(location_ui_t *);
+static void on_dialog_response(GtkWidget *, int, location_ui_t *);
+static void schedule_new_dialog(location_ui_t *);
+static DBusMessage *location_ui_display_dialog(location_ui_t *, GList *,
+					       DBusMessage *);
+static DBusMessage *location_ui_close_dialog(location_ui_t *, GList *,
+					     DBusMessage *);
+static int compare_dialog_path(location_ui_dialog *, const char *);
+static DBusHandlerResult on_client_request(DBusConnection *, DBusMessage *,
+					   gpointer data);
+static DBusHandlerResult find_dbus_cb(DBusConnection *, DBusMessage *,
+				      gpointer data);
 
-	pan = hildon_pannable_area_new();
-	hildon_pannable_area_add_with_viewport(HILDON_PANNABLE_AREA(pan),
-					       widget_obj);
-	g_object_set(pan, "hscrollbar-policy", 2, NULL);
-	gtk_widget_set_size_request(pan, -1, 350);
+/* variables */
+static struct client_request_table clireq_table[5] = {
+	{"location_verification", create_privacy_verification_dialog},
+	{"location_information", create_privacy_information_dialog},
+	{"location_timeout", create_privacy_timeout_dialog},
+	{"location_expired", create_privacy_expired_dialog},
+	{"location_default_supl", create_default_supl_dialog},
+};
 
-	gtk_box_pack_start(GTK_BOX(dialog), pan, FALSE, TRUE, 0);
-	gtk_widget_show_all(dialog);
-	return dialog;
-}
+static struct location_ui_dialog funcmap[6] = {
+	{"/com/nokia/location/ui/bt_disconnected",
+	 create_bt_disconnected_dialog, NULL, 0, 0, 0, 0, 0},
+	{"/com/nokia/location/ui/disclaimer",
+	 create_disclaimer_dialog, NULL, 0, 0, 0, 0, 0},
+	{"/com/nokia/location/ui/enable_gps",
+	 create_enable_gps_dialog, NULL, 0, 0, 0, 0, 0},
+	{"/com/nokia/location/ui/enable_network",
+	 create_enable_network_dialog, NULL, 0, 0, 0, 0, 0},
+	{"/com/nokia/location/ui/enable_positioning",
+	 create_positioning_dialog, NULL, 0, 0, 0, 0, 0},
+	{"/com/nokia/location/ui/enable_agnss",
+	 create_agnss_dialog, NULL, 0, 0, 0, 0, 0},
+};
 
-GtkWidget *create_positioning_dialog(void)
-{
-	char *gps_on_text, *done_text, *gps_text, *net_text;
-	GtkWidget *dialog, *cb_gps, *cb_net;
+static display_close_map dc_map[2] = {
+	{"display", location_ui_display_dialog},
+	{"close", location_ui_close_dialog},
+};
 
-	gps_on_text =
-	    dcgettext(NULL, "loca_ti_switch_gps_network_on", LC_MESSAGES);
-	done_text = dcgettext("hildon-libs", "wdgt_bd_done", LC_MESSAGES);
+static DBusObjectPathVTable client_vtable = {
+	NULL, on_client_request, NULL, NULL, NULL, NULL,
+};
 
-	dialog = gtk_dialog_new_with_buttons(gps_on_text, NULL,
-					     GTK_DIALOG_NO_SEPARATOR, done_text,
-					     GTK_RESPONSE_OK, NULL);
+static DBusObjectPathVTable find_cb_vtable = {
+	NULL, find_dbus_cb, NULL, NULL, NULL, NULL,
+};
 
-	cb_gps = hildon_check_button_new(HILDON_SIZE_FINGER_HEIGHT);
-	gps_text = dcgettext(NULL, "loca_fi_gps", LC_MESSAGES);
-	gtk_button_set_label(GTK_BUTTON(cb_gps), gps_text);
-	gtk_box_pack_start(GTK_BOX(dialog), cb_gps, FALSE, FALSE, 0);
-	gtk_widget_show(cb_gps);
-	g_object_set_data(G_OBJECT(dialog), "gps-cb", cb_gps);
-
-	cb_net = hildon_check_button_new(HILDON_SIZE_FINGER_HEIGHT);
-	net_text = dcgettext(NULL, "loca_fi_network", LC_MESSAGES);
-	gtk_button_set_label(GTK_BUTTON(cb_net), net_text);
-	gtk_box_pack_start(GTK_BOX(dialog), cb_net, FALSE, FALSE, 0);
-	gtk_widget_show(cb_gps);
-	g_object_set_data(G_OBJECT(dialog), "net-cb", cb_net);
-
-	return dialog;
-}
-
-GtkWidget *create_enable_gps_dialog(void)
-{
-	char *text = dcgettext(0, "loca_nc_switch_gps_on", LC_MESSAGES);
-	return hildon_note_new_confirmation(NULL, text);
-}
-
-GtkWidget *create_enable_network_dialog(void)
-{
-	char *text = dcgettext(0, "loca_nc_switch_network_on", LC_MESSAGES);
-	return hildon_note_new_confirmation(NULL, text);
-}
-
-GtkWidget *create_agnss_dialog(void)
-{
-	char *text =
-	    dcgettext(NULL, "loca_nc_switch_network_and_gps_on", LC_MESSAGES);
-	return hildon_note_new_confirmation(NULL, text);
-}
-
-GtkWidget *create_bt_disconnect_dialog(void)
-{
-	char *text = dcgettext(NULL, "loca_nc_bt_reconnect", LC_MESSAGES);
-	return hildon_note_new_confirmation(NULL, text);
-}
-
+/* function implementations */
 GtkWidget *create_privacy_verification_dialog(DBusMessage * msg,
 					      DBusError * err)
 {
@@ -258,6 +274,7 @@ GtkWidget *create_privacy_expired_dialog(DBusMessage * msg, DBusError * err)
 			       "Provide requestor and client");
 		return NULL;
 	}
+
 	if (accepted)
 		text = dcgettext(NULL, "loca_ni_accept_expired", LC_MESSAGES);
 	else
@@ -281,139 +298,139 @@ GtkWidget *create_default_supl_dialog(DBusMessage * msg, DBusError * err)
 	ret = hildon_note_new_information(NULL, text_dup);
 	g_free(text_dup);
 	return ret;
-
 }
 
-GtkWidget *create_bt_disabled_dialog(void)
+GtkWidget *create_bt_disconnected_dialog(void)
 {
-	return hildon_note_new_information(NULL,
-					   dcgettext("osso-connectivity-ui",
-						     "conn_ib_not_available_bt_off",
-						     LC_MESSAGES));
+	char *t = dcgettext(NULL, "loca_nc_bt_reconnect", LC_MESSAGES);
+	return hildon_note_new_confirmation(NULL, t);
 }
 
-int compare_dialog_path(location_ui_t * location_ui, const char *path)
+GtkWidget *create_disclaimer_dialog(void)
 {
-	return strcmp((const char *)location_ui->current_dialog, path);
+	char *disclaimer_text, *disclaimer_ok, *disclaimer_reject;
+	char *fi_disclaimer_text;
+	GtkWidget *dialog, *label, *pan;
+
+	disclaimer_text = dcgettext(NULL, "loca_ti_disclaimer", LC_MESSAGES);
+	disclaimer_ok = dcgettext(NULL, "loca_bd_disclaimer_ok", LC_MESSAGES);
+	disclaimer_reject =
+	    dcgettext(NULL, "loca_bd_disclaimer_reject", LC_MESSAGES);
+
+	/* TODO: What is 42 below? */
+	dialog = gtk_dialog_new_with_buttons(disclaimer_text, NULL,
+					     GTK_DIALOG_NO_SEPARATOR,
+					     disclaimer_ok, GTK_RESPONSE_OK,
+					     disclaimer_reject, 42, NULL);
+
+	fi_disclaimer_text = dcgettext(NULL, "loca_fi_disclaimer", LC_MESSAGES);
+	label = gtk_label_new(fi_disclaimer_text);
+	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
+	gtk_widget_set_name(label, "osso-SmallFont");
+
+	pan = hildon_pannable_area_new();
+	hildon_pannable_area_add_with_viewport(HILDON_PANNABLE_AREA(pan),
+					       label);
+	g_object_set(G_OBJECT(pan), "hscrollbar-policy", 2, NULL);
+	gtk_widget_set_size_request(pan, -1, 350);
+
+	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), pan, FALSE, TRUE,
+			   0);
+	gtk_widget_show_all(dialog);
+	return dialog;
 }
 
-DBusMessage *location_ui_close_dialog(location_ui_t * location_ui, GList * list,
-				      DBusMessage * msg)
+GtkWidget *create_enable_gps_dialog(void)
 {
-	dialog_data_t *dialog_data;
-	int dialog_active, note_type;
-	GList *dialogs;
-	char *dbus_obj_path;
-	DBusMessage *new_msg;
+	char *t = dcgettext(NULL, "loca_nc_switch_gps_on", LC_MESSAGES);
+	return hildon_note_new_confirmation(NULL, t);
+}
 
-	dialog_data = list->data;
-	dialog_active = dialog_data->dialog_active;
-	new_msg = dbus_message_new_method_return(msg);
-	dbus_message_append_args(new_msg, DBUS_TYPE_INT32,
-				 &dialog_data->dialog_response_code,
-				 DBUS_TYPE_INVALID);
-	/* TODO: Review */
-	if (dialog_data->window) {
-		if (HILDON_IS_NOTE(dialog_data->window)) {
-			note_type = 0;
-			g_object_get(G_OBJECT(dialog_data->window), "note-type", &note_type, NULL);
-			if ((unsigned int)(note_type - 2) > 1)
-				gtk_widget_destroy(GTK_WIDGET
-						   (dialog_data->window));
-		} else {
-			gtk_widget_destroy(GTK_WIDGET(dialog_data->window));
+GtkWidget *create_enable_network_dialog(void)
+{
+	char *t = dcgettext(NULL, "loca_nc_switch_network_on", LC_MESSAGES);
+	return hildon_note_new_confirmation(NULL, t);
+}
+
+GtkWidget *create_positioning_dialog(void)
+{
+	char *gps_on_text, *done_text, *gps_text, *net_text;
+	GtkWidget *dialog, *cb_gps, *cb_net;
+
+	gps_on_text =
+	    dcgettext(NULL, "loca_ti_switch_gps_network_on", LC_MESSAGES);
+	done_text = dcgettext("hildon-libs", "wdgt_bd_done", LC_MESSAGES);
+
+	dialog = gtk_dialog_new_with_buttons(gps_on_text, NULL,
+					     GTK_DIALOG_NO_SEPARATOR, done_text,
+					     GTK_RESPONSE_OK, NULL);
+
+	cb_gps = hildon_check_button_new(HILDON_SIZE_FINGER_HEIGHT);
+	gps_text = dcgettext(NULL, "loca_fi_gps", LC_MESSAGES);
+	gtk_button_set_label(GTK_BUTTON(cb_gps), gps_text);
+	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), cb_gps, FALSE,
+			   FALSE, 0);
+	gtk_widget_show(cb_gps);
+	g_object_set_data(G_OBJECT(dialog), "gps-cb", cb_gps);
+
+	cb_net = hildon_check_button_new(HILDON_SIZE_FINGER_HEIGHT);
+	net_text = dcgettext(NULL, "loca_fi_network", LC_MESSAGES);
+	gtk_button_set_label(GTK_BUTTON(cb_net), net_text);
+	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), cb_net, FALSE,
+			   FALSE, 0);
+	gtk_widget_show(cb_net);
+	g_object_set_data(G_OBJECT(dialog), "net-cb", cb_net);
+
+	return dialog;
+}
+
+GtkWidget *create_agnss_dialog(void)
+{
+	char *t =
+	    dcgettext(NULL, "loca_nc_switch_network_and_gps_on", LC_MESSAGES);
+	return hildon_note_new_confirmation(NULL, t);
+}
+
+location_ui_dialog *find_next_dialog(location_ui_t * location_ui)
+{
+	g_debug(G_STRFUNC);
+	location_ui_dialog *next_dialog, *tmp_dialog;
+	gint32 cur_priority;
+	GList *dialog_list;
+
+	dialog_list = location_ui->dialogs;
+	if (!dialog_list) {
+		g_debug("%s: dialog_list is 0", G_STRLOC);
+		return NULL;
+	}
+
+	next_dialog = NULL;
+	/* I think this should be -1 */
+	cur_priority = 0x80000000;
+
+	do {
+		while (1) {
+			tmp_dialog = dialog_list->data;
+			if (tmp_dialog->state == STATE_QUEUE) {
+				g_debug("it's state_queue");
+				break;
+			}
+
+			g_debug("it's NOT state_queue");
+			dialog_list = g_list_next(dialog_list);
+			if (!dialog_list) {
+				return next_dialog;
+			}
 		}
-		dialog_data->window = NULL;
-	}
+		dialog_list = g_list_next(dialog_list);
+		if (tmp_dialog->priority > cur_priority) {
+			next_dialog = tmp_dialog;
+			cur_priority = tmp_dialog->priority;
+		}
+	} while (dialog_list);
 
-	if (dialog_data->maybe_func) {
-		dialog_data->dialog_active = 0;
-		dialog_data->some_dbus_arg = 0;
-		dialog_data->dialog_response_code = -1;
-	} else {
-		dialogs = g_list_delete_link(location_ui->dialogs, list);
-		dbus_obj_path = dialog_data->dbus_object_path;
-		location_ui->dialogs = dialogs;
-		dbus_connection_unregister_object_path(location_ui->dbus,
-						       dbus_obj_path);
-		g_free(dialog_data->dbus_object_path);
-		g_slice_free1(24u, dialog_data);	/* TODO: (sizeof(dialog_data), dialog_data) ? */
-	}
-	if (dialog_active == 2) {
-		g_assert(location_ui->current_dialog == dialog_data);
-		location_ui->current_dialog = NULL;
-		schedule_new_dialog(location_ui);
-	}
-	return new_msg;
-}
-
-DBusMessage *location_ui_display_dialog(location_ui_t * location_ui,
-					GList * list, DBusMessage * msg)
-{
-	dbus_bool_t dbus_ret;
-	dialog_data_t *dialog_data;
-	int dialog_active_or_in_use;
-	gboolean have_no_dialog;
-	int some_dbus_arg;
-
-	/* TODO: Review some_dbus_arg */
-	dbus_ret =
-	    dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &some_dbus_arg,
-				  DBUS_TYPE_INVALID);
-	dialog_data = list->data;
-	dialog_active_or_in_use = dialog_data->dialog_active;
-	if (!dbus_ret)
-		some_dbus_arg = 0;
-	if (dialog_active_or_in_use)
-		return dbus_message_new_error_printf(msg,
-						     "com.nokia.Location.UI.Error.InUse",
-						     "%d",
-						     dialog_data->dialog_response_code);
-
-	have_no_dialog = location_ui->current_dialog == NULL;
-	dialog_data->some_dbus_arg = some_dbus_arg;
-	dialog_data->dialog_active = 1;
-	if (have_no_dialog)
-		schedule_new_dialog(location_ui);
-	return dbus_message_new_method_return(msg);
-}
-
-DBusHandlerResult find_dbus_cb(DBusConnection *conn, DBusMessage * in_msg, void* data)
-{
-	int cnt, idx;
-	const char *member, *message_path;
-	GList *dialog_entry;
-	gboolean found;
-	DBusMessage *out_msg;
-
-	location_ui_t* location_ui = (location_ui_t*)data;
-
-	cnt = 0;
-	member = dbus_message_get_member(in_msg);
-	message_path = dbus_message_get_path(in_msg);
-	while (1) {
-		found = g_str_equal(member, display_close_map[cnt].text);
-		idx = cnt++;
-		if (found)
-			break;
-		if (cnt == 2)
-			return 1;
-	}
-	/* Lookup function in previously created GList with path */
-	dialog_entry = g_list_find_custom(location_ui->dialogs, message_path,
-					  (GCompareFunc) compare_dialog_path);
-	if (dialog_entry) {
-		out_msg = display_close_map[idx].func(location_ui, dialog_entry, in_msg);
-    } else {
-		out_msg = dbus_message_new_error(in_msg,
-					   "org.freedesktop.DBus.Error.Failed",
-					   "Bad object");
-	}
-
-	dbus_connection_send(location_ui->dbus, out_msg, NULL);
-	dbus_connection_flush(location_ui->dbus);
-	dbus_message_unref(out_msg);
-	return 0;
+	g_debug("%s final path: %s", G_STRFUNC, next_dialog->path);
+	return next_dialog;
 }
 
 int on_inactivity_timeout(location_ui_t * location_ui)
@@ -427,40 +444,39 @@ int on_inactivity_timeout(location_ui_t * location_ui)
 void on_dialog_response(GtkWidget * dialog, int gtk_response,
 			location_ui_t * location_ui)
 {
-	dialog_data_t *item;
+	location_ui_dialog *item;
 	GTypeInstance *gps_cb_data, *net_cb_data;
-	GType hildon_checkbox_type;
-	HildonCheckButton *net_cb_button, *gps_cb_button;
-	gboolean net_button_active, gps_button_active;
 	int gps_active_status, net_active_status, resp_code;
+	HildonCheckButton *gps_cb_button, *net_cb_button;
+	gboolean gps_button_active, net_button_active;
 	DBusMessage *msg;
 	gpointer cur_dialog;
 
 	item = g_object_get_data(G_OBJECT(dialog), "dialog-data");
-	g_assert(item != NULL);
+	g_assert(dialog != NULL);
 
 	item->dialog_response_code = 0;
 	gps_cb_data = g_object_get_data(G_OBJECT(dialog), "gps-cb");
 	net_cb_data = g_object_get_data(G_OBJECT(dialog), "net-cb");
+
 	if (gps_cb_data && net_cb_data) {
-		hildon_checkbox_type = hildon_check_button_get_type();
-		net_cb_button = (HildonCheckButton *)
-		    g_type_check_instance_cast(net_cb_data,
-					       hildon_checkbox_type);
-		net_button_active =
-		    hildon_check_button_get_active(net_cb_button);
-		gps_cb_button = (HildonCheckButton *)
-		    g_type_check_instance_cast(gps_cb_data,
-					       hildon_checkbox_type);
+		gps_cb_button = HILDON_CHECK_BUTTON(gps_cb_data);
+		net_cb_button = HILDON_CHECK_BUTTON(net_cb_data);
 		gps_button_active =
 		    hildon_check_button_get_active(gps_cb_button);
+		net_button_active =
+		    hildon_check_button_get_active(net_cb_button);
+
 		gps_active_status = item->dialog_response_code;
+
+		if (gps_button_active)
+			gps_active_status |= 1u;
+
 		if (net_button_active)
 			net_active_status = 2;
 		else
 			net_active_status = 0;
-		if (gps_button_active)
-			gps_active_status |= 1u;
+
 		item->dialog_response_code =
 		    gps_active_status | net_active_status;
 	} else if (gtk_response == GTK_RESPONSE_OK) {
@@ -471,13 +487,14 @@ void on_dialog_response(GtkWidget * dialog, int gtk_response,
 			resp_code = 1;
 		else
 			/* unknown/invalid ? */
+			/* TODO: At least gets triggered when /disclaimer is Rejected */
 			resp_code = -1;
 		item->dialog_response_code = resp_code;
 	}
 
-	msg =
-	    dbus_message_new_signal(item->dbus_object_path, LUI_DBUS_DIALOG,
-				    "response");
+	g_message("%s: response=%d", G_STRFUNC, item->dialog_response_code);
+
+	msg = dbus_message_new_signal(item->path, LUI_DBUS_DIALOG, "response");
 	dbus_message_append_args(msg, DBUS_TYPE_INT32,
 				 &item->dialog_response_code,
 				 DBUS_TYPE_INVALID);
@@ -493,75 +510,39 @@ void on_dialog_response(GtkWidget * dialog, int gtk_response,
 	}
 }
 
-location_ui_dialog *find_next_dialog(location_ui_t * location_ui)
-{
-	location_ui_dialog *next_dialog, *tmp_dialog;
-	gint32 cur_priority;
-    GList* dialog_list;
-
-	dialog_list = location_ui->dialogs;
-	if (!dialog_list) {
-		return NULL;
-    }
-
-	next_dialog = NULL;
-	/* I think this should be -1 */
-	cur_priority = 0x80000000;
-
-	do {
-		while (1) {
-			tmp_dialog = (location_ui_dialog *) dialog_list->data;
-			if (tmp_dialog->state == STATE_QUEUE)
-				break;
-            dialog_list = g_list_next(dialog_list);
-			if (!dialog_list) {
-				return next_dialog;
-            }
-		}
-        dialog_list = g_list_next(dialog_list);
-		if (tmp_dialog->maybe_priority > cur_priority) {
-			next_dialog = tmp_dialog;
-			cur_priority = tmp_dialog->maybe_priority;
-		}
-	} while (dialog_list);
-	return next_dialog;
-}
-
 void schedule_new_dialog(location_ui_t * location_ui)
 {
-	location_ui_dialog *dialog;
-	int destroy_data;
-	int dialog_instance;
-	gboolean dialog_instantiated;
+	g_debug(G_STRFUNC);
+	gpointer destroy_data;
 
 	g_assert(location_ui->current_dialog == NULL);
+	location_ui->current_dialog = find_next_dialog(location_ui);
 
-	dialog = find_next_dialog(location_ui);
-	location_ui->current_dialog = dialog;
-	if (dialog) {
+	if (location_ui->current_dialog) {
 		g_assert(location_ui->current_dialog->state == STATE_QUEUE);
 
-		destroy_data = dialog->maybe_dialog_instance;
-		dialog_instantiated = dialog->maybe_dialog_instance == 0;
-		dialog->state = STATE_2;
-		if (dialog_instantiated) {
-			g_assert(location_ui->current_dialog->get_instance != NULL);
+		destroy_data = location_ui->current_dialog->window;
+		location_ui->current_dialog->state = STATE_2;
 
-			dialog_instance = dialog->get_instance();
-			dialog->maybe_dialog_instance = dialog_instance;
-			g_object_set_data(G_OBJECT(location_ui->current_dialog),
+		if (location_ui->current_dialog->window == NULL) {
+			location_ui->current_dialog->window =
+			    GTK_WINDOW(location_ui->current_dialog->
+				       dialog_func());
+			g_object_set_data(G_OBJECT
+					  (location_ui->current_dialog->window),
 					  "dialog-data",
 					  location_ui->current_dialog);
-			g_signal_connect_data(location_ui->current_dialog,
+			g_signal_connect_data(location_ui->
+					      current_dialog->window,
 					      "response",
 					      (GCallback) on_dialog_response,
 					      location_ui,
-						  /* TODO: this seems wrong */
+					      /* TODO: this seems wrong */
 					      (GClosureNotify) destroy_data,
 					      (GConnectFlags) destroy_data);
 		}
+		gtk_window_present(location_ui->current_dialog->window);
 
-		gtk_window_present(GTK_WINDOW(location_ui->current_dialog));
 		if (location_ui->inactivity_timeout_id) {
 			g_source_remove(location_ui->inactivity_timeout_id);
 			location_ui->inactivity_timeout_id = 0;
@@ -574,24 +555,115 @@ void schedule_new_dialog(location_ui_t * location_ui)
 	}
 }
 
-DBusHandlerResult on_client_request(DBusConnection *conn, DBusMessage *msg, void* data)
+DBusMessage *location_ui_display_dialog(location_ui_t * location_ui,
+					GList * list, DBusMessage * msg)
 {
-  return 0; /* TODO */
-#if 0
-  int vtable_idx;
-  const char *v5;
-  int v7;
-  dialog_data *v8;
-  dialog_data *dialog;
-  char *dialog_path;
-  GList *new_dialogs;
-  char *dbus_path;
-  GObject *v13;
-  DBusMessage *new_msg;
-  DBusMessage *method_call;
-  DBusError error;
+	int some_dbus_arg;
+	location_ui_dialog *dialog;
 
-  location_ui = (location_ui_t*)data;
+	if (!dbus_message_get_args
+	    (msg, NULL, DBUS_TYPE_INT32, &some_dbus_arg, DBUS_TYPE_INVALID))
+		some_dbus_arg = 0;
+
+	dialog = list->data;
+
+	if (dialog->dialog_active)
+		return dbus_message_new_error_printf(msg,
+						     "com.nokia.Location.UI.Error.InUse",
+						     "%d",
+						     dialog->dialog_response_code);
+
+	dialog->some_dbus_arg = some_dbus_arg;
+	/* TODO: dialog_active and state is the same? */
+	dialog->dialog_active = 1;
+	dialog->state = 1;
+	if (location_ui->current_dialog == NULL)
+		schedule_new_dialog(location_ui);
+	return dbus_message_new_method_return(msg);
+}
+
+DBusMessage *location_ui_close_dialog(location_ui_t * location_ui, GList * list,
+				      DBusMessage * msg)
+{
+	location_ui_dialog *dialog;
+	DBusMessage *new_msg;
+	GList *dialogs;
+	int note_type;
+	char *dbus_obj_path;
+
+	dialog = list->data;
+
+	new_msg = dbus_message_new_method_return(msg);
+	dbus_message_append_args(new_msg, DBUS_TYPE_INT32,
+				 dialog->dialog_response_code,
+				 DBUS_TYPE_INVALID);
+
+	/* TODO: Review */
+	if (dialog->window) {
+		if (HILDON_IS_NOTE(dialog->window)) {
+			note_type = 0;
+			g_object_get(G_OBJECT(dialog->window), "note-type",
+				     &note_type, NULL);
+			if ((unsigned int)(note_type - 2) > 1)
+				gtk_widget_destroy(GTK_WIDGET(dialog->window));
+		} else {
+			gtk_widget_destroy(GTK_WIDGET(dialog->window));
+		}
+		dialog->window = NULL;
+	}
+
+	if (dialog->dialog_func) {
+		dialog->dialog_active = 0;
+		dialog->some_dbus_arg = 0;
+		dialog->dialog_response_code = -1;
+	} else {
+		dialogs = g_list_delete_link(location_ui->dialogs, list);
+		dbus_obj_path = dialog->path;
+		location_ui->dialogs = dialogs;
+		dbus_connection_unregister_object_path(location_ui->dbus,
+						       dbus_obj_path);
+		g_free(dialog->path);
+		g_slice_free1(24u, dialog);	/* TODO: (sizeof(location_ui_dialog), dialog) ? */
+	}
+
+	/* TODO: state? */
+	if (dialog->dialog_active == 2) {
+		g_assert(location_ui->current_dialog == dialog);
+		location_ui->current_dialog = NULL;
+		schedule_new_dialog(location_ui);
+	}
+
+	return new_msg;
+}
+
+int compare_dialog_path(location_ui_dialog * dialog, const char *path)
+{
+	return strcmp(dialog->path, path);
+}
+
+DBusHandlerResult on_client_request(DBusConnection * conn, DBusMessage * msg,
+				    gpointer data)
+{
+	/* TODO: */
+	g_message(G_STRFUNC);
+	const char *member = dbus_message_get_member(msg);
+	g_debug("member=%s", member);
+	return 0;
+#if 0
+signed int __fastcall on_client_request(int a1, DBusMessage *msg, location_ui *locui)
+{
+  int vtable_idx; // r4
+  const char *v5; // r6
+  int v7; // r5
+  dialog_data *v8; // r0
+  dialog_data *dialog; // r4
+  char *dialog_path; // r0
+  GList *new_dialogs; // r0
+  char *dbus_path; // r1
+  GObject *v13; // r0
+  DBusMessage *new_msg; // r5
+  DBusMessage *method_call; // [sp+Ch] [bp-38h]
+  DBusError error; // [sp+10h] [bp-34h]
 
   method_call = msg;
   vtable_idx = 0;
@@ -640,12 +712,53 @@ DBusHandlerResult on_client_request(DBusConnection *conn, DBusMessage *msg, void
   dbus_connection_flush(locui->dbus);
   dbus_message_unref(new_msg);
   return 0;
+}
 #endif
+}
+
+DBusHandlerResult find_dbus_cb(DBusConnection * conn, DBusMessage * in_msg,
+			       gpointer data)
+{
+	location_ui_t *location_ui = (location_ui_t *) data;
+	const char *member, *message_path;
+	int i, idx = -1;
+	DBusMessage *out_msg;
+	GList *dialog_entry;
+
+	member = dbus_message_get_member(in_msg);
+	message_path = dbus_message_get_path(in_msg);
+
+	g_debug("%s: member=%s; path=%s", G_STRFUNC, member, message_path);
+
+	for (i = 0; i < nelem(dc_map); i++) {
+		if (g_str_equal(member, dc_map[i].text)) {
+			idx = i;
+			break;
+		}
+	}
+	if (idx < 0)
+		return 1;
+
+	dialog_entry = g_list_find_custom(location_ui->dialogs, message_path,
+					  (GCompareFunc) compare_dialog_path);
+
+	if (dialog_entry)
+		out_msg = dc_map[idx].func(location_ui, dialog_entry, in_msg);
+	else
+		out_msg =
+		    dbus_message_new_error(in_msg,
+					   "org.freedesktop.DBus.Error.Failed",
+					   "Bad object");
+
+	dbus_connection_send(location_ui->dbus, out_msg, NULL);
+	dbus_connection_flush(location_ui->dbus);
+	dbus_message_unref(out_msg);
+	return 0;
 }
 
 int main(int argc, char **argv, char **envp)
 {
-	int cnt = 0, prevcnt = 0, funccnt = 0;
+	int i;
 	const char *path;
 	location_ui_t location_ui;
 
@@ -653,6 +766,7 @@ int main(int argc, char **argv, char **envp)
 	bindtextdomain("osso-location-ui", "/usr/share/locale");
 	bind_textdomain_codeset("osso-location-ui", "UTF-8");
 	textdomain("osso-location-ui");
+
 	gtk_init(&argc, &argv);
 
 	location_ui.dialogs = NULL;
@@ -676,22 +790,20 @@ int main(int argc, char **argv, char **envp)
 	}
 
 	if (!dbus_connection_register_object_path
-	    (location_ui.dbus, LUI_DBUS_PATH, &vtable, &location_ui)) {
+	    (location_ui.dbus, LUI_DBUS_PATH, &client_vtable, &location_ui)) {
 		g_printerr("Failed to register object\n");
 		return 1;
 	}
 
-	do {
+	for (i = 0; i < nelem(funcmap); i++) {
 		location_ui.dialogs =
-		    g_list_append(location_ui.dialogs, &funcmap[prevcnt]);
-		++cnt;
-		path = funcmap[funccnt].path;
-		++funccnt;
+		    g_list_append(location_ui.dialogs, &funcmap[i]);
+		path = funcmap[i].path;
+		g_debug("Registering %s", path);
 		dbus_connection_register_object_path(location_ui.dbus, path,
-						     &find_callback_vtable,
+						     &find_cb_vtable,
 						     &location_ui);
-		prevcnt = cnt;
-	} while (cnt != 7);
+	}
 
 	schedule_new_dialog(&location_ui);
 	gtk_main();
