@@ -92,9 +92,9 @@ static DBusMessage *location_ui_close_dialog(location_ui_t *, GList *,
 					     DBusMessage *);
 static int compare_dialog_path(location_ui_dialog *, const char *);
 static DBusHandlerResult on_client_request(DBusConnection *, DBusMessage *,
-					   gpointer data);
+					   gpointer);
 static DBusHandlerResult find_dbus_cb(DBusConnection *, DBusMessage *,
-				      gpointer data);
+				      gpointer);
 
 /* variables */
 static struct client_request_table clireq_table[5] = {
@@ -776,22 +776,20 @@ int main(int argc, char **argv, char **envp)
 
 	location_ui.dbus = dbus_bus_get(DBUS_BUS_SYSTEM, NULL);
 	if (!location_ui.dbus) {
-		g_printerr("Failed to init DBus\n");
+		g_critical("Failed to init DBus");
 		return 1;
 	}
 
 	dbus_connection_setup_with_g_main(location_ui.dbus, NULL);
-	if (dbus_bus_request_name(location_ui.dbus, LUI_DBUS_NAME, 0, NULL) !=
-	    1) {
-		g_printerr
-		    ("Failed to register service '%s'. Already running?\n",
-		     LUI_DBUS_NAME);
+	if (dbus_bus_request_name(location_ui.dbus, LUI_DBUS_NAME, 0, NULL) != 1) {
+		g_critical("Failed to register service '%s'. Already running?",
+			     LUI_DBUS_NAME);
 		return 1;
 	}
 
 	if (!dbus_connection_register_object_path
 	    (location_ui.dbus, LUI_DBUS_PATH, &client_vtable, &location_ui)) {
-		g_printerr("Failed to register object\n");
+		g_critical("Failed to register object");
 		return 1;
 	}
 
