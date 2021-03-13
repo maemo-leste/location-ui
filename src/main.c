@@ -157,18 +157,13 @@ GtkWidget *create_privacy_verification_dialog(DBusMessage * msg,
 
 	switch (accepted) {
 	case 0:
-		text =
-		    dcgettext(NULL, "loca_nc_request_default_reject",
-			      LC_MESSAGES);
+		text = dgettext(NULL, "loca_nc_request_default_reject");
 		break;
 	case 1:
-		text =
-		    dcgettext(NULL, "loca_nc_request_default_accept",
-			      LC_MESSAGES);
+		text = dgettext(NULL, "loca_nc_request_default_accept");
 		break;
 	case -1:
-		text =
-		    dcgettext(NULL, "loca_nc_request_no_default", LC_MESSAGES);
+		text = dgettext(NULL, "loca_nc_request_no_default");
 		break;
 	default:
 		return NULL;
@@ -178,7 +173,7 @@ GtkWidget *create_privacy_verification_dialog(DBusMessage * msg,
 	if (**arr)
 		unk_text = *arr;
 	else
-		unk_text = dcgettext(NULL, "loca_va_unknown", LC_MESSAGES);
+		unk_text = dgettext(NULL, "loca_va_unknown");
 
 	text_dup = g_strdup_printf(text, unk_text);
 	ret = hildon_note_new_confirmation(NULL, text_dup);
@@ -206,13 +201,13 @@ GtkWidget *create_privacy_information_dialog(DBusMessage * msg, DBusError * err)
 		return NULL;
 	}
 
-	text = dcgettext(NULL, "loca_ni_req_sent", LC_MESSAGES);
+	text = dgettext(NULL, "loca_ni_req_sent");
 
 	/* TODO: review */
 	if (**arr)
 		unk_text = *arr;
 	else
-		unk_text = dcgettext(NULL, "loca_va_unknown", LC_MESSAGES);
+		unk_text = dgettext(NULL, "loca_va_unknown");
 
 	text_dup = g_strdup_printf(text, unk_text);
 	ret = hildon_note_new_information(NULL, text_dup);
@@ -241,15 +236,15 @@ GtkWidget *create_privacy_timeout_dialog(DBusMessage * msg, DBusError * err)
 	}
 
 	if (accepted)
-		text = dcgettext(NULL, "loca_ni_accepted", LC_MESSAGES);
+		text = dgettext(NULL, "loca_ni_accepted");
 	else
-		text = dcgettext(NULL, "loca_ni_rejected", LC_MESSAGES);
+		text = dgettext(NULL, "loca_ni_rejected");
 
 	/* TODO: review */
 	if (**arr)
 		unk_text = *arr;
 	else
-		unk_text = dcgettext(NULL, "loca_va_unknown", LC_MESSAGES);
+		unk_text = dgettext(NULL, "loca_va_unknown");
 
 	text_dup = g_strdup_printf(text, unk_text);
 	ret = hildon_note_new_information(NULL, text_dup);
@@ -276,9 +271,9 @@ GtkWidget *create_privacy_expired_dialog(DBusMessage * msg, DBusError * err)
 	}
 
 	if (accepted)
-		text = dcgettext(NULL, "loca_ni_accept_expired", LC_MESSAGES);
+		text = dgettext(NULL, "loca_ni_accept_expired");
 	else
-		text = dcgettext(NULL, "loca_ni_reject_expired", LC_MESSAGES);
+		text = dgettext(NULL, "loca_ni_reject_expired");
 
 	return hildon_note_new_information(NULL, text);
 }
@@ -293,7 +288,7 @@ GtkWidget *create_default_supl_dialog(DBusMessage * msg, DBusError * err)
 	    (msg, err, DBUS_TYPE_STRING, &res, DBUS_TYPE_INVALID))
 		return NULL;
 
-	text = dcgettext(NULL, "loca_in_default_supl_used", LC_MESSAGES);
+	text = dgettext(NULL, "loca_in_default_supl_used");
 	text_dup = g_strdup_printf(text, res);
 	ret = hildon_note_new_information(NULL, text_dup);
 	g_free(text_dup);
@@ -302,7 +297,7 @@ GtkWidget *create_default_supl_dialog(DBusMessage * msg, DBusError * err)
 
 GtkWidget *create_bt_disconnected_dialog(void)
 {
-	char *t = dcgettext(NULL, "loca_nc_bt_reconnect", LC_MESSAGES);
+	char *t = dgettext(NULL, "loca_nc_bt_reconnect");
 	return hildon_note_new_confirmation(NULL, t);
 }
 
@@ -312,10 +307,9 @@ GtkWidget *create_disclaimer_dialog(void)
 	char *fi_disclaimer_text;
 	GtkWidget *dialog, *label, *pan;
 
-	disclaimer_text = dcgettext(NULL, "loca_ti_disclaimer", LC_MESSAGES);
-	disclaimer_ok = dcgettext(NULL, "loca_bd_disclaimer_ok", LC_MESSAGES);
-	disclaimer_reject =
-	    dcgettext(NULL, "loca_bd_disclaimer_reject", LC_MESSAGES);
+	disclaimer_text = dgettext(NULL, "loca_ti_disclaimer");
+	disclaimer_ok = dgettext(NULL, "loca_bd_disclaimer_ok");
+	disclaimer_reject = dgettext(NULL, "loca_bd_disclaimer_reject");
 
 	/* TODO: What is 42 below? */
 	dialog = gtk_dialog_new_with_buttons(disclaimer_text, NULL,
@@ -323,32 +317,30 @@ GtkWidget *create_disclaimer_dialog(void)
 					     disclaimer_ok, GTK_RESPONSE_OK,
 					     disclaimer_reject, 42, NULL);
 
-	fi_disclaimer_text = dcgettext(NULL, "loca_fi_disclaimer", LC_MESSAGES);
+	fi_disclaimer_text = dgettext(NULL, "loca_fi_disclaimer");
 	label = gtk_label_new(fi_disclaimer_text);
 	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
 	gtk_widget_set_name(label, "osso-SmallFont");
 
 	pan = hildon_pannable_area_new();
-	hildon_pannable_area_add_with_viewport(HILDON_PANNABLE_AREA(pan),
-					       label);
+	hildon_pannable_area_add_with_viewport(HILDON_PANNABLE_AREA(pan), label);
 	g_object_set(G_OBJECT(pan), "hscrollbar-policy", 2, NULL);
 	gtk_widget_set_size_request(pan, -1, 350);
 
-	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), pan, FALSE, TRUE,
-			   0);
+	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), pan, FALSE, TRUE, 0);
 	gtk_widget_show_all(dialog);
 	return dialog;
 }
 
 GtkWidget *create_enable_gps_dialog(void)
 {
-	char *t = dcgettext(NULL, "loca_nc_switch_gps_on", LC_MESSAGES);
+	char *t = dgettext(NULL, "loca_nc_switch_gps_on");
 	return hildon_note_new_confirmation(NULL, t);
 }
 
 GtkWidget *create_enable_network_dialog(void)
 {
-	char *t = dcgettext(NULL, "loca_nc_switch_network_on", LC_MESSAGES);
+	char *t = dgettext(NULL, "loca_nc_switch_network_on");
 	return hildon_note_new_confirmation(NULL, t);
 }
 
@@ -357,27 +349,24 @@ GtkWidget *create_positioning_dialog(void)
 	char *gps_on_text, *done_text, *gps_text, *net_text;
 	GtkWidget *dialog, *cb_gps, *cb_net;
 
-	gps_on_text =
-	    dcgettext(NULL, "loca_ti_switch_gps_network_on", LC_MESSAGES);
-	done_text = dcgettext("hildon-libs", "wdgt_bd_done", LC_MESSAGES);
+	gps_on_text = dgettext(NULL, "loca_ti_switch_gps_network_on");
+	done_text = dgettext("hildon-libs", "wdgt_bd_done");
 
 	dialog = gtk_dialog_new_with_buttons(gps_on_text, NULL,
 					     GTK_DIALOG_NO_SEPARATOR, done_text,
 					     GTK_RESPONSE_OK, NULL);
 
 	cb_gps = hildon_check_button_new(HILDON_SIZE_FINGER_HEIGHT);
-	gps_text = dcgettext(NULL, "loca_fi_gps", LC_MESSAGES);
+	gps_text = dgettext(NULL, "loca_fi_gps");
 	gtk_button_set_label(GTK_BUTTON(cb_gps), gps_text);
-	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), cb_gps, FALSE,
-			   FALSE, 0);
+	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), cb_gps, FALSE, FALSE, 0);
 	gtk_widget_show(cb_gps);
 	g_object_set_data(G_OBJECT(dialog), "gps-cb", cb_gps);
 
 	cb_net = hildon_check_button_new(HILDON_SIZE_FINGER_HEIGHT);
-	net_text = dcgettext(NULL, "loca_fi_network", LC_MESSAGES);
+	net_text = dgettext(NULL, "loca_fi_network");
 	gtk_button_set_label(GTK_BUTTON(cb_net), net_text);
-	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), cb_net, FALSE,
-			   FALSE, 0);
+	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), cb_net, FALSE, FALSE, 0);
 	gtk_widget_show(cb_net);
 	g_object_set_data(G_OBJECT(dialog), "net-cb", cb_net);
 
@@ -386,8 +375,7 @@ GtkWidget *create_positioning_dialog(void)
 
 GtkWidget *create_agnss_dialog(void)
 {
-	char *t =
-	    dcgettext(NULL, "loca_nc_switch_network_and_gps_on", LC_MESSAGES);
+	char *t = dgettext(NULL, "loca_nc_switch_network_and_gps_on");
 	return hildon_note_new_confirmation(NULL, t);
 }
 
@@ -462,10 +450,8 @@ void on_dialog_response(GtkWidget * dialog, int gtk_response,
 	if (gps_cb_data && net_cb_data) {
 		gps_cb_button = HILDON_CHECK_BUTTON(gps_cb_data);
 		net_cb_button = HILDON_CHECK_BUTTON(net_cb_data);
-		gps_button_active =
-		    hildon_check_button_get_active(gps_cb_button);
-		net_button_active =
-		    hildon_check_button_get_active(net_cb_button);
+		gps_button_active = hildon_check_button_get_active(gps_cb_button);
+		net_button_active = hildon_check_button_get_active(net_cb_button);
 
 		gps_active_status = item->dialog_response_code;
 
@@ -477,8 +463,7 @@ void on_dialog_response(GtkWidget * dialog, int gtk_response,
 		else
 			net_active_status = 0;
 
-		item->dialog_response_code =
-		    gps_active_status | net_active_status;
+		item->dialog_response_code = gps_active_status | net_active_status;
 	} else if (gtk_response == GTK_RESPONSE_OK) {
 		/* ok/accepted */
 		item->dialog_response_code = 0;
@@ -679,8 +664,7 @@ signed int __fastcall on_client_request(int a1, DBusMessage *msg, location_ui *l
          &error);
   if ( v7 )
   {
-    if ( dbus_error_is_set(&error) )
-      g_assertion_message_expr(0, "main.c", 466, "on_client_request", "!dbus_error_is_set (&error)");
+    g_assert(!dbus_error_is_set(&error));
     v8 = (dialog_data *)g_slice_alloc0(0x18u);
     ++locui[1].dialogs;                         // not sure what this does
     dialog = v8;
@@ -703,8 +687,7 @@ signed int __fastcall on_client_request(int a1, DBusMessage *msg, location_ui *l
   }
   else
   {
-    if ( !dbus_error_is_set(&error) )
-      g_assertion_message_expr(0, "main.c", 490, "on_client_request", "dbus_error_is_set (&error)");
+    g_assert(dbus_error_is_set(&error));
     new_msg = dbus_message_new_error(method_call, error.name, error.message);
     dbus_error_free(&error);
   }
@@ -745,10 +728,8 @@ DBusHandlerResult find_dbus_cb(DBusConnection * conn, DBusMessage * in_msg,
 	if (dialog_entry)
 		out_msg = dc_map[idx].func(location_ui, dialog_entry, in_msg);
 	else
-		out_msg =
-		    dbus_message_new_error(in_msg,
-					   "org.freedesktop.DBus.Error.Failed",
-					   "Bad object");
+		out_msg = dbus_message_new_error(in_msg,
+				"org.freedesktop.DBus.Error.Failed", "Bad object");
 
 	dbus_connection_send(location_ui->dbus, out_msg, NULL);
 	dbus_connection_flush(location_ui->dbus);
