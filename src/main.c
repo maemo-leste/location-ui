@@ -580,7 +580,7 @@ DBusMessage *location_ui_close_dialog(location_ui_t * location_ui, GList * list,
 
 	new_msg = dbus_message_new_method_return(msg);
 	dbus_message_append_args(new_msg, DBUS_TYPE_INT32,
-				 dialog->dialog_response_code,
+				 &dialog->dialog_response_code,
 				 DBUS_TYPE_INVALID);
 
 	/* TODO: Review */
